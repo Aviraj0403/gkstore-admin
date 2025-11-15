@@ -19,23 +19,23 @@ class EB extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex flex-col justify-center items-center text-center bg-gradient-to-br from-[#fff3e6] to-[#ffe0cc] p-6">
+        <div className="min-h-screen flex flex-col justify-center items-center text-center bg-gradient-to-br from-[#fce4ec] to-[#f8bbd0] p-6">
           <img
-            src="/rest.png"
-            alt="Error Illustration"
+            src="/gurmeet-kaur-error.png"
+            alt="Beauty Products Error"
             className="max-w-[280px] mb-6"
           />
-          <h2 className="text-2xl font-extrabold text-[#d84315] mb-4 font-sans">
+          <h2 className="text-2xl font-extrabold text-[#ad1457] mb-4 font-sans">
             Oops! Something went wrong.
           </h2>
           <p className="text-base text-gray-700 max-w-md mb-6">
-            Looks like our kitchen had a little fire 🔥. Don’t worry, we’re fixing it!
+            It seems like we’re having a little glitch with our beauty products. No worries—we’re fixing it as quickly as possible!
           </p>
           <Link
-            to="/admin/dashboard"
-            className="inline-block px-6 py-3 bg-[#ff7043] text-white rounded-lg font-semibold transition duration-300 ease-in-out hover:bg-[#d84315]"
+            to="/"
+            className="inline-block px-6 py-3 bg-[#ad1457] text-white rounded-lg font-semibold transition duration-300 ease-in-out hover:bg-[#880e4f]"
           >
-            Go Back Home
+            Go Back to Store
           </Link>
         </div>
       );

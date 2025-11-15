@@ -37,3 +37,8 @@ export const getMainCategories = async () => {
   const res = await Axios.get('/category/getMainCategories');
   return res.data.categories;   // array of { _id, name, ... }
 };
+
+export const getSubCategories = async (parentCategoryId) => {
+  const res = await Axios.get(`/category/getSubCategories/${parentCategoryId}`);
+  return res.data.subcategories; // returns array of subcategories
+};

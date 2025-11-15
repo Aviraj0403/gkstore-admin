@@ -139,7 +139,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12 z-10 relative">
         <DashboardCard title="Total Revenue" value="₹92,800" color="orange" />
         <DashboardCard title="Today's Orders" value={orders.length} color="blue" />
-        <DashboardCard title="Dishes Available" value="56" color="green" />
+        <DashboardCard title="Products Available" value="56" color="green" />
         <DashboardCard title="Customers Served" value="980" color="purple" />
       </div>
 

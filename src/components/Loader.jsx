@@ -7,7 +7,7 @@ export default function Loader() {
       <div className="relative w-full h-full flex items-center justify-center bg-opacity-50 bg-gray-800">
         {/* Animated GIF */}
         <img
-          src="/beauty.gif" // Path to the GIF in public/k
+          src="/beauty.gif" // Path to the GIF in public folder
           alt="Loading..."
           className="w-48 h-48 sm:w-64 sm:h-64 object-contain animate-pulse"
         />

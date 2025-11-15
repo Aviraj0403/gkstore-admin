@@ -7,19 +7,19 @@ import Unauthorized from "./pages/Unauthorized";
 import ProtectedRoute from "./secureRoute/ProtectedRoute";
 import HomePage from "./pages/HomePage";
 import AddFoodForm from "./pages/Product/AddProductForm";
-import AdminFood from "./pages/Product/AdminProducts";
+import AdminProduct from "./pages/Product/AdminProducts";
 import CategoryList from "./pages/category/CatgoryList";
 import AddCategoryForm from "./pages/category/AddCategoryForm";
 import EditCategory from "./pages/category/EditCategory";
 import ViewCategory from "./pages/category/ViewCatgory";
-import EditFood from "./pages/Product/EditProduct";
-import FoodView from "./pages/Product/FoodView";
 import OffersList from "./pages/offers/OffersList";
 import TotalUserOnWeb from "./pages/users/TotalUserOnWeb";
 import NotFoundPage from './pages/PNF/NotFoundPage';
 import SalesReport from "./pages/report/SaleDash";
 import AdminOrderManager from "./pages/orders/AdminOrderManager"
 import PaymentList from "./pages/payments/PaymentList";
+import EditProduct from "./pages/Product/EditProduct";
+import ProductView from "./pages/Product/ProductView";
 const router = createBrowserRouter([
   {
     path: "/",
@@ -56,15 +56,15 @@ const router = createBrowserRouter([
       },
       {
           path:"adminProducts",
-          element: < AdminFood />
+          element: < AdminProduct />
       },
       {
           path:"editProduct/:productId",
-          element: <EditFood />
+          element: <EditProduct />
       },
       {
            path:"product-view/:productId",
-           element: <FoodView />
+           element: <ProductView />
       },
       {
         path: "home",

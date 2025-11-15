@@ -8,7 +8,7 @@ const NotFoundPage = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       navigate("/admin/dashboard");
-    }, 5000);
+    }, 5000); // Adjusted to redirect after 5 seconds for quicker user feedback
     return () => clearTimeout(timer); // cleanup
   }, [navigate]);
 
@@ -19,12 +19,12 @@ const NotFoundPage = () => {
       <div style={styles.content}>
         <h1 style={styles.title}>404 - Page Not Found</h1>
         <p style={styles.message}>
-          Oops! Looks like this dish is not on the menu 🍽️
+          Oops! Looks like this page is a bit out of stock. 🌸
           <br />
-          Don’t worry, we’ll guide you back home in a few seconds…
+          No worries, we’ll get you back to our fabulous collection in a few seconds…
         </p>
         <Link to="/admin/dashboard" style={styles.button}>
-          Back to Home
+          Back to Store
         </Link>
       </div>
     </div>
@@ -38,12 +38,12 @@ const styles = {
     justifyContent: "center",
     alignItems: "center",
     textAlign: "center",
-    backgroundImage: "url('/rest.png')", // Image used as background
-    backgroundSize: "cover", // Make sure the image covers the whole screen
-    backgroundPosition: "center", // Center the image
-    backgroundRepeat: "no-repeat", // Don't repeat the image
-    position: "relative", // Position to allow the overlay to cover it
-    padding: "20px", // Some padding for better layout
+    backgroundImage: "url('/gurmeet-kaur-beauty-background.jpg')", // Custom background for the beauty store
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+    position: "relative",
+    padding: "20px",
   },
   overlay: {
     position: "absolute",
@@ -51,40 +51,40 @@ const styles = {
     left: 0,
     width: "100%",
     height: "100%",
-    backgroundColor: "rgba(0, 0, 0, 0.6)", // Dark overlay to improve readability
-    zIndex: 1, // Makes sure overlay is on top of the background image
+    backgroundColor: "rgba(0, 0, 0, 0.6)", // Dark overlay for readability
+    zIndex: 1,
   },
   content: {
     position: "relative",
-    zIndex: 2, // Ensures content is above the overlay
-    color: "#fff", // White text for contrast on dark overlay
-    padding: "20px", // Padding to space out content
-    borderRadius: "8px", // Optional: rounded corners for the content block
-    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)", // Adds shadow for a bit of depth
-    maxWidth: "600px", // Max width for better layout on large screens
-    width: "100%", // Full width up to max width
+    zIndex: 2,
+    color: "#fff", // White text for contrast
+    padding: "20px",
+    borderRadius: "8px",
+    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+    maxWidth: "600px",
+    width: "100%",
   },
   title: {
-    fontSize: "2.2rem", // Larger title for emphasis
-    fontWeight: "700", // Bold text
-    marginBottom: "10px", // Spacing between title and message
-    fontFamily: "Segoe UI, sans-serif", // Stylish font
+    fontSize: "2.4rem", // Slightly larger for emphasis
+    fontWeight: "700",
+    marginBottom: "10px",
+    fontFamily: "'Segoe UI', sans-serif",
   },
   message: {
-    fontSize: "1.1rem", // Slightly larger text for message
-    maxWidth: "400px", // Limit the width for better readability
-    margin: "0 auto 20px auto", // Centering the message and adding spacing
+    fontSize: "1.1rem",
+    maxWidth: "400px",
+    margin: "0 auto 20px auto",
   },
   button: {
     display: "inline-block",
     padding: "10px 20px",
-    background: "#ff7043", // Button color
+    background: "#ad1457", // Brand color for button
     color: "#fff",
     textDecoration: "none",
     borderRadius: "6px",
-    fontWeight: "600", // Bold text for the button
-    transition: "background 0.3s ease", // Smooth transition on hover
-    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)", // Optional: shadow for button
+    fontWeight: "600",
+    transition: "background 0.3s ease",
+    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
   },
 };
 
