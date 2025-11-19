@@ -10,9 +10,9 @@ const AddCategoryForm = () => {
   const [displayOrder, setDisplayOrder] = useState('');
   const [type, setType] = useState('Main');
   const [parentCategory, setParentCategory] = useState('');
-  const [images, setImages] = useState([]);           // File[]
-  const [imagePreviews, setImagePreviews] = useState([]); // string[]
-  const [mainCategories, setMainCategories] = useState([]);
+  const [images, setImages] = useState([]);           // File[] for images
+  const [imagePreviews, setImagePreviews] = useState([]); // string[] for image previews
+  const [mainCategories, setMainCategories] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [fetchingParents, setFetchingParents] = useState(false);
   const fileInputRef = useRef(null);
@@ -62,11 +62,11 @@ const AddCategoryForm = () => {
     });
   };
 
-  // Submit
+  // Submit form
   const handleSubmit = async () => {
     if (!name) return toast.error('Category Name is required');
-    if (images.length !== 2) return toast.error('Exactly 2 images are required');
-    if (type === 'Sub' && !parentCategory) return toast.error('Select a parent category');
+    if (type === 'Main' && images.length !== 2) return toast.error('Exactly 2 images are required for Main category');
+    if (type === 'Sub' && !parentCategory) return toast.error('Please select a parent category for Subcategory');
 
     const formData = new FormData();
     formData.append('name', name);
@@ -98,7 +98,7 @@ const AddCategoryForm = () => {
         <h2 className="text-2xl font-semibold mb-6 text-gray-800">Add New Category</h2>
 
         <div className="space-y-6">
-          {/* Name */}
+          {/* Category Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700">Category Name</label>
             <input
@@ -135,9 +135,9 @@ const AddCategoryForm = () => {
             />
           </div>
 
-          {/* Type */}
+          {/* Category Type (Main / Sub) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Category Type</label>
             <div className="flex space-x-6">
               <label className="flex items-center">
                 <input type="radio" name="type" value="Main" checked={type === 'Main'} onChange={(e) => setType(e.target.value)} className="mr-2" />
@@ -150,12 +150,12 @@ const AddCategoryForm = () => {
             </div>
           </div>
 
-          {/* Parent Dropdown */}
+          {/* Parent Category (only for Sub category) */}
           {type === 'Sub' && (
             <div>
-              <label htmlFor="parent" className="block text-sm font-medium text-gray-700">Parent Category</label>
+              <label htmlFor="parent" className="block text-sm font-medium text-gray-700">Select Parent Category</label>
               {fetchingParents ? (
-                <p className="mt-2 text-sm text-gray-500">Loading...</p>
+                <p className="mt-2 text-sm text-gray-500">Loading parent categories...</p>
               ) : (
                 <select
                   id="parent"
@@ -172,50 +172,52 @@ const AddCategoryForm = () => {
             </div>
           )}
 
-          {/* Images */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Upload Images (exactly 2)
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageChange}
-                className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
-              />
-              <span className="text-xs text-gray-500">{images.length}/2</span>
-            </div>
+          {/* Image Upload (only for Main categories) */}
+          {type === 'Main' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Upload Images (exactly 2)
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageChange}
+                  className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+                />
+                <span className="text-xs text-gray-500">{images.length}/2</span>
+              </div>
 
-            {/* Preview Grid */}
-            <div className="mt-4 grid grid-cols-2 gap-4">
-              {imagePreviews.map((url, i) => (
-                <div key={i} className="relative group">
-                  <img src={url} alt={`Img ${i + 1}`} className="w-full h-40 object-cover rounded-lg border shadow" />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(i)}
-                    className="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
-                  >
-                    X
-                  </button>
-                </div>
-              ))}
-              {images.length < 2 && Array.from({ length: 2 - images.length }).map((_, i) => (
-                <div key={i} className="border-2 border-dashed border-gray-300 rounded-lg h-40 flex items-center justify-center text-gray-400">
-                  + Image {images.length + i + 1}
-                </div>
-              ))}
+              {/* Preview Grid */}
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                {imagePreviews.map((url, i) => (
+                  <div key={i} className="relative group">
+                    <img src={url} alt={`Img ${i + 1}`} className="w-full h-40 object-cover rounded-lg border shadow" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(i)}
+                      className="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
+                {images.length < 2 && Array.from({ length: 2 - images.length }).map((_, i) => (
+                  <div key={i} className="border-2 border-dashed border-gray-300 rounded-lg h-40 flex items-center justify-center text-gray-400">
+                    + Image {images.length + i + 1}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Submit */}
+          {/* Submit Button */}
           <div className="mt-6">
             <button
               onClick={handleSubmit}
-              disabled={loading || images.length !== 2}
+              disabled={loading || (type === 'Main' && images.length !== 2)}
               className="w-full py-3 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
             >
               {loading ? (
