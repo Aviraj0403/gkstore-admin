@@ -417,7 +417,7 @@ export default function AddProductForm() {
             label="Discount (%)"
             name="discount"
             type="number"
-            value={formData.discount}
+            value={formData.discount || "0"}
             onChange={handleChange}
             placeholder="e.g. 10"
           />
