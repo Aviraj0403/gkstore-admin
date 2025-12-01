@@ -173,45 +173,60 @@ const AddCategoryForm = () => {
           )}
 
           {/* Image Upload (only for Main categories) */}
-          {type === 'Main' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Upload Images (exactly 2)
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageChange}
-                  className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
-                />
-                <span className="text-xs text-gray-500">{images.length}/2</span>
-              </div>
+         {/* Image Upload (only for Main categories) */}
+{type === 'Main' && (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-2">
+      Upload Images (1. Desktop, 2. Mobile)
+    </label>
+    <div className="flex items-center gap-3">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handleImageChange}
+        className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+      />
+      <span className="text-xs text-gray-500">{images.length}/2</span>
+    </div>
 
-              {/* Preview Grid */}
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                {imagePreviews.map((url, i) => (
-                  <div key={i} className="relative group">
-                    <img src={url} alt={`Img ${i + 1}`} className="w-full h-40 object-cover rounded-lg border shadow" />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(i)}
-                      className="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
-                    >
-                      X
-                    </button>
-                  </div>
-                ))}
-                {images.length < 2 && Array.from({ length: 2 - images.length }).map((_, i) => (
-                  <div key={i} className="border-2 border-dashed border-gray-300 rounded-lg h-40 flex items-center justify-center text-gray-400">
-                    + Image {images.length + i + 1}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+    {/* Preview Grid with Labels */}
+    <div className="mt-4 grid grid-cols-2 gap-4">
+      {imagePreviews.map((url, i) => (
+        <div key={i} className="relative group">
+          <img
+            src={url}
+            alt={`Img ${i + 1}`}
+            className="w-full h-40 object-cover rounded-lg border shadow"
+          />
+          <button
+            type="button"
+            onClick={() => removeImage(i)}
+            className="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
+          >
+            X
+          </button>
+          {/* Add labels for Mobile and Desktop */}
+          <div className="absolute bottom-2 left-2 bg-black text-white text-xs px-2 py-1 rounded">
+            {i === 0 ? 'Desktop' : 'Mobile'}
+          </div>
+        </div>
+      ))}
+      {images.length < 2 &&
+        Array.from({ length: 2 - images.length }).map((_, i) => (
+          <div
+            key={i}
+            className="border-2 border-dashed border-gray-300 rounded-lg h-40 flex items-center justify-center text-gray-400"
+          >
+             + Image {images.length + i + 1} {i === 0 ? 'Desktop' : 'Mobile'}
+    
+          </div>
+        ))}
+    </div>
+  </div>
+)}
+
 
           {/* Submit Button */}
           <div className="mt-6">
