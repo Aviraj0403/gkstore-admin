@@ -7,10 +7,31 @@ import AdminOrderDetails from './AdminOrderDetails';
 const getOrderDetailsAdmin = async (orderId) => {
   try {
     const res = await axios.get(`/orders/getOrderById/${orderId}`);
-    if (res.data && res.data._id) return res.data;
-    throw new Error('Invalid order data');
+
+    // Log response for debugging (remove in production if needed)
+    console.log('Raw API response for order:', res.data);
+
+    // Handle different possible response structures
+    const orderData = res.data?.order || res.data?.data || res.data;
+
+    // Validate that we actually got a valid order
+    if (orderData && (orderData._id || orderData.id)) {
+      return orderData;
+    }
+
+    // If no valid order found
+    throw new Error(res.data?.message || 'Order not found or invalid response from server');
   } catch (error) {
-    throw error;
+    // Improve error message based on axios error
+    const message =
+      error.response?.data?.message ||
+      error.message ||
+      'Failed to fetch order details';
+
+    // Re-throw with better context
+    const err = new Error(message);
+    err.status = error.response?.status;
+    throw err;
   }
 };
 

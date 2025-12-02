@@ -109,7 +109,7 @@ const SalesReport = () => {
   return (
     <div className="container mx-auto p-8">
       <h1 className="text-4xl font-extrabold text-center text-gray-800 mb-8">
-        Restaurant Sales Report
+        Store Sales Report
       </h1>
 
       <div className="text-center mb-6">
