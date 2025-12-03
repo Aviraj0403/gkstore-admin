@@ -1,22 +1,33 @@
-// src/pages/admin/EditProduct.jsx
-import React, { useEffect, useState } from "react";
+// src/pages/admin/EditProductForm.jsx
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getProduct, updateProduct } from "../../services/ProductApi";
-import { getAllCategories } from "../../services/CategoryApi";
-import { toast } from "react-hot-toast";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-export default function EditProduct() {
+import {
+  getProduct,
+  updateProduct,
+} from "../../services/ProductApi";
+import {
+  getAllCategories,
+  getSubCategories,
+} from "../../services/CategoryApi";
+
+export default function EditProductForm() {
   const { productId } = useParams();
   const navigate = useNavigate();
 
+  /* ------------------ STATE ------------------ */
   const [formData, setFormData] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Image handling
-  const [newImages, setNewImages] = useState([]);
-  const [newPreviews, setNewPreviews] = useState([]);
-  const [removedImages, setRemovedImages] = useState([]);
+  // Images
+  const [existingImages, setExistingImages] = useState([]); // URLs from server
+  const [newImages, setNewImages] = useState([]);           // File objects
+  const [newPreviews, setNewPreviews] = useState([]);      // preview URLs
+  const [removedImages, setRemovedImages] = useState([]);  // URLs to delete
 
   // Variant temp state
   const [variant, setVariant] = useState({
@@ -27,265 +38,277 @@ export default function EditProduct() {
     packaging: "Bottle",
   });
 
-  /* --------------------------------------------------------------
-     FETCH PRODUCT + CATEGORIES (runs **once** per productId)
-   -------------------------------------------------------------- */
+  /* ------------------ FETCH DATA ------------------ */
   useEffect(() => {
-    let mounted = true;
-
-    const fetchData = async () => {
+    async function fetchData() {
       try {
         const [prodRes, catRes] = await Promise.all([
           getProduct(productId),
-          getAllCategories({ page: 1, limit: 200 }),
+          getAllCategories({ page: 1, limit: 200, search: "", sortField: "name", sortOrder: 1 }),
         ]);
 
-        if (!mounted) return;
-
-        if (!prodRes?.success || !prodRes.product) {
+        if (!prodRes.success || !prodRes.product) {
           toast.error("Product not found");
-          navigate("/admin/products");
+          navigate("/admin/adminProducts");
           return;
         }
 
         const p = prodRes.product;
 
-        /* ----- NORMALISE EVERY FIELD TO MATCH FORM ----- */
+        // Normalise data exactly like AddProductForm expects
         const normalized = {
-          ...p,
-          // category → ID (for <select>)
-          category: typeof p.category === "object" ? p.category?._id || "" : p.category || "",
-          // subCategory → name (for <input>)
-          subCategory: typeof p.subCategory === "object" ? p.subCategory?.name || "" : p.subCategory || "",
-          // tags → comma-separated string
+          name: p.name || "",
+          brand: p.brand || "",
+          description: p.description || "",
+          category: p.category?._id || p.category || "",
+          subCategory: p.subCategory?._id || p.subCategory || "",
+          discount: p.discount || 0,
           tags: Array.isArray(p.tags) ? p.tags.join(", ") : p.tags || "",
-          // variants → always array
-          variants: Array.isArray(p.variants) ? p.variants : [],
-          // additionalInfo → always object + match your fields
+          isFeatured: !!p.isFeatured,
+          isHotProduct: !!p.isHotProduct,
+          isBestSeller: !!p.isBestSeller,
+          status: p.status || "Active",
           additionalInfo: {
             skinType: p.additionalInfo?.skinType || "",
-            shelfLife: p.additionalInfo?.shelfLife || "",
+            shelfLife: p.additionalInfo?.shelfLife || 12,
             usageInstructions: p.additionalInfo?.usageInstructions || "",
           },
-          // boolean flags
-          isHotProduct: !!p.isHotProduct,
-          isFeatured: !!p.isFeatured,
-          isBestSeller: !!p.isBestSeller,
+          variants: Array.isArray(p.variants) ? p.variants.map(v => ({
+            ...v,
+            price: v.price?.toString() || "",
+            stockQty: v.stockQty?.toString() || "0",
+          })) : [],
         };
 
         setFormData(normalized);
-      } catch (err) {
-        if (mounted) {
-          console.error("Fetch error:", err);
-          toast.error("Failed to load product");
-        }
-      }
+        setExistingImages(p.pimages || []);
 
-      if (catRes?.success) {
-        setCategories(catRes.categories);
+        if (catRes.success && Array.isArray(catRes.categories)) {
+          setCategories(catRes.categories);
+        }
+      } catch (err) {
+        toast.error("Failed to load product");
+        console.error(err);
       }
-    };
+    }
 
     if (productId) fetchData();
-
-    return () => {
-      mounted = false;
-    };
   }, [productId, navigate]);
 
-  /* --------------------------------------------------------------
-     INPUT HANDLER
-   -------------------------------------------------------------- */
+  // Load sub-categories when main category changes
+  useEffect(() => {
+    async function fetchSubCategories() {
+      if (formData?.category) {
+        try {
+          const subs = await getSubCategories(formData.category);
+          setSubCategories(subs);
+        } catch {
+          toast.error("Failed to load sub-categories");
+        }
+      } else {
+        setSubCategories([]);
+      }
+    }
+    fetchSubCategories();
+  }, [formData?.category]);
+
+  /* ------------------ HANDLERS ------------------ */
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
-    if (name.startsWith("additionalInfo.")) {
-      const field = name.split(".")[1];
-      setFormData((prev) => ({
+    if (name === "category") {
+      setFormData(prev => ({
         ...prev,
-        additionalInfo: {
-          ...prev.additionalInfo,
-          [field]: type === "checkbox" ? checked : value,
-        },
+        category: value,
+        subCategory: "",
+      }));
+    } else if (name.startsWith("additionalInfo.")) {
+      const field = name.split(".")[1];
+      setFormData(prev => ({
+        ...prev,
+        additionalInfo: { ...prev.additionalInfo, [field]: value },
       }));
     } else {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         [name]: type === "checkbox" ? checked : value,
       }));
     }
   };
 
-  /* --------------------------------------------------------------
-     IMAGE HANDLING
-   -------------------------------------------------------------- */
-  const handleFileChange = (e) => {
-    const files = Array.from(e.target.files);
-    const total =
-      (formData?.pimages?.length || 0) - removedImages.length + newImages.length + files.length;
-
-    if (total > 5) {
-      toast.error("Maximum 5 images allowed in total.");
-      return;
-    }
-
-    const previews = files.map((f) => URL.createObjectURL(f));
-    setNewImages((prev) => [...prev, ...files]);
-    setNewPreviews((prev) => [...prev, ...previews]);
+  const handleVariantChange = (field, val) => {
+    setVariant(prev => ({ ...prev, [field]: val }));
   };
 
-  const removeNewImage = (i) => {
-    setNewImages((prev) => prev.filter((_, idx) => idx !== i));
-    setNewPreviews((prev) => prev.filter((_, idx) => idx !== i));
-  };
-
-  const removeExistingImage = (url) => {
-    setRemovedImages((prev) => [...prev, url]);
-    setFormData((prev) => ({
-      ...prev,
-      pimages: prev.pimages.filter((img) => img !== url),
-    }));
-  };
-
-  /* --------------------------------------------------------------
-     VARIANT HANDLING
-   -------------------------------------------------------------- */
   const addVariant = () => {
-    const { size, color, price } = variant;
-    if (!size || !color || !price) {
-      toast.error("Size, Color and Price are required");
-      return;
-    }
-    if (formData.variants.some((v) => v.size === size && v.color === color)) {
-      toast.error("Variant with this size & color already exists");
+    const { size, color, price, stockQty, packaging } = variant;
+
+    if (!size || !color || !price || isNaN(parseFloat(price))) {
+      toast.error("Size, Color, and Price are required.");
       return;
     }
 
-    setFormData((prev) => ({
+    const exists = formData.variants.some(v => v.size === size && v.color === color);
+    if (exists) {
+      toast.error("Variant with this size & color already exists.");
+      return;
+    }
+
+    setFormData(prev => ({
       ...prev,
       variants: [
         ...prev.variants,
         {
           size,
           color,
-          price: Number(price),
-          stockQty: Number(variant.stockQty) || 0,
-          packaging: variant.packaging,
+          price: parseFloat(price),
+          stockQty: parseInt(stockQty) || 0,
+          packaging: packaging || "Bottle",
         },
       ],
     }));
+
     setVariant({ size: "", color: "", price: "", stockQty: "", packaging: "Bottle" });
+    toast.success("Variant added!");
   };
 
-  const removeVariant = (i) => {
-    setFormData((prev) => ({
+  const removeVariant = (index) => {
+    setFormData(prev => ({
       ...prev,
-      variants: prev.variants.filter((_, idx) => idx !== i),
+      variants: prev.variants.filter((_, i) => i !== index),
     }));
+    toast.success("Variant removed!");
   };
 
-  /* --------------------------------------------------------------
-     SUBMIT
-   -------------------------------------------------------------- */
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    const total = existingImages.length - removedImages.length + newImages.length + files.length;
+
+    if (total > 5) {
+      toast.error("Maximum 5 images allowed in total.");
+      return;
+    }
+
+    const previews = files.map(f => URL.createObjectURL(f));
+    setNewImages(prev => [...prev, ...files]);
+    setNewPreviews(prev => [...prev, ...previews]);
+    toast.success(`${files.length} image(s) added!`);
+  };
+
+  const removeExistingImage = (url) => {
+    setRemovedImages(prev => [...prev, url]);
+    setExistingImages(prev => prev.filter(img => img !== url));
+  };
+
+  const removeNewImage = (index) => {
+    setNewImages(prev => prev.filter((_, i) => i !== index));
+    setNewPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeAllImages = () => {
+    setExistingImages([]);
+    setNewImages([]);
+    setNewPreviews([]);
+    setRemovedImages(prev => [...prev, ...existingImages]);
+    toast.success("All images cleared!");
+  };
+
+  /* ------------------ SUBMIT ------------------ */
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if ((existingImages.length + newImages.length) === 0) {
+      toast.error("At least one image is required.");
+      return;
+    }
+
+    if (formData.variants.length === 0) {
+      toast.error("At least one variant is required.");
+      return;
+    }
+
     setLoading(true);
+    const fd = new FormData();
+
+    // Basic fields
+    Object.entries(formData).forEach(([key, val]) => {
+      if (key !== "variants" && key !== "additionalInfo") {
+        fd.append(key, val);
+      }
+    });
+
+    fd.append("tags", formData.tags);
+    fd.append("additionalInfo", JSON.stringify(formData.additionalInfo));
+
+    // Variants (indexed like in Add form)
+    formData.variants.forEach((v, i) => {
+      fd.append(`variants[${i}][size]`, v.size);
+      fd.append(`variants[${i}][color]`, v.color);
+      fd.append(`variants[${i}][price]`, v.price);
+      fd.append(`variants[${i}][stockQty]`, v.stockQty);
+      fd.append(`variants[${i}][packaging]`, v.packaging || "Bottle");
+    });
+
+    // Images
+    newImages.forEach(file => fd.append("pimages", file));
+    if (removedImages.length) {
+      fd.append("removedImages", JSON.stringify(removedImages));
+    }
 
     try {
-      const fd = new FormData();
-
-      // Primitive fields
-      const primitive = [
-        "name",
-        "brand",
-        "description",
-        "category",
-        "subCategory",
-        "tags",
-        "price",
-        "discount",
-        "status",
-        "isHotProduct",
-        "isFeatured",
-        "isBestSeller",
-      ];
-      primitive.forEach((f) => {
-        if (formData[f] !== undefined && formData[f] !== null) {
-          fd.append(f, formData[f]);
-        }
-      });
-
-      // JSON fields
-      fd.append("additionalInfo", JSON.stringify(formData.additionalInfo));
-      fd.append("variants", JSON.stringify(formData.variants));
-      if (removedImages.length) {
-        fd.append("removedImages", JSON.stringify(removedImages));
-      }
-
-      // New images
-      newImages.forEach((file) => fd.append("pimages", file));
-
       const res = await updateProduct(productId, fd);
-
-      if (res?.success) {
+      if (res.success) {
         toast.success("Product updated successfully!");
-        navigate(`/admin/product-details/${productId}`);
+        navigate("/admin/adminProducts");
       } else {
-        toast.error(res?.message || "Update failed");
+        toast.error(res.message || "Failed to update product");
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Error updating product");
+      toast.error(err.response?.data?.message || "Server error");
     } finally {
       setLoading(false);
     }
   };
 
-  /* --------------------------------------------------------------
-     RENDER
-   -------------------------------------------------------------- */
-  if (!formData) return <p className="text-center py-10">Loading...</p>;
+  if (!formData) return <div className="text-center py-20">Loading...</div>;
 
+  /* ------------------ RENDER ------------------ */
   return (
     <div className="min-h-screen bg-orange-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl p-8">
+      <ToastContainer />
+      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl p-8">
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">
           Edit Product
         </h1>
 
-        {/* ---------- IMAGE UPLOAD ---------- */}
+        {/* Image Upload Section */}
         <div className="mb-8">
           <div className="bg-orange-100 border-2 border-dashed border-orange-400 rounded-xl p-6 text-center">
-            {/* Existing */}
-            {formData.pimages?.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
-                {formData.pimages.map((img, i) => (
-                  <div key={i} className="relative">
-                    <img
-                      src={img}
-                      alt="Existing"
-                      className="w-full h-32 object-cover rounded-lg shadow-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeExistingImage(img)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* New previews */}
-            {newPreviews.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+            {(existingImages.length > 0 || newPreviews.length > 0) ? (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-4">
+                {existingImages
+                  .filter(img => !removedImages.includes(img))
+                  .map((src, i) => (
+                    <div key={`exist-${i}`} className="relative">
+                      <img
+                        src={src}
+                        alt="Existing"
+                        className="w-full h-32 object-cover rounded-lg shadow-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeExistingImage(src)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 {newPreviews.map((src, i) => (
-                  <div key={i} className="relative">
+                  <div key={`new-${i}`} className="relative">
                     <img
                       src={src}
-                      alt={`Preview ${i + 1}`}
+                      alt="New"
                       className="w-full h-32 object-cover rounded-lg shadow-sm"
                     />
                     <button
@@ -298,149 +321,117 @@ export default function EditProduct() {
                   </div>
                 ))}
               </div>
+            ) : (
+              <p className="text-gray-600">No images</p>
             )}
 
-            <input
-              type="file"
-              id="product-image-upload"
-              multiple
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            <label
-              htmlFor="product-image-upload"
-              className="bg-orange-500 text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-orange-600 transition font-medium"
-            >
-              Upload Images (Max 5 Total)
-            </label>
+            {(existingImages.length - removedImages.length + newImages.length) > 0 && (
+              <button
+                type="button"
+                onClick={removeAllImages}
+                className="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+              >
+                Remove All Images
+              </button>
+            )}
+
+            {(existingImages.length - removedImages.length + newImages.length) < 5 && (
+              <div className="mt-4">
+                <input
+                  type="file"
+                  id="edit-image-upload"
+                  multiple
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="edit-image-upload"
+                  className="bg-orange-500 text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-orange-600 transition"
+                >
+                  Upload More Images (max 5 total)
+                </label>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ---------- FORM ---------- */}
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          <InputField label="Name *" name="name" value={formData.name} onChange={handleChange} />
-          <InputField label="Brand" name="brand" value={formData.brand} onChange={handleChange} />
+          <InputField label="Name *" name="name" value={formData.name} onChange={handleChange} placeholder="Enter product name" />
+          <InputField label="Brand *" name="brand" value={formData.brand} onChange={handleChange} placeholder="e.g. L'Oréal, Himalaya" />
+          <TextAreaField label="Description *" name="description" value={formData.description} onChange={handleChange} placeholder="Describe the product" />
 
-          <TextAreaField
-            label="Description"
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-          />
-
-          {/* Category & Subcategory */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category *
-              </label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                required
-                className="w-full border rounded-lg p-3 focus:ring-2 focus:ring-orange-500"
-              >
-                <option value="">Select Category</option>
-                {categories.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name}
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+            <select
+              name="category"
+              value={formData.category}
+              onChange={handleChange}
+              required
+              className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="">Select Category</option>
+              {categories
+                .filter(cat => cat.type === "Main")
+                .map(cat => (
+                  <option key={cat._id} value={cat._id}>
+                    {cat.name}
                   </option>
                 ))}
-              </select>
-            </div>
+            </select>
+          </div>
 
-            <InputField
-              label="Subcategory"
+          {/* Sub-Category */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sub-Category</label>
+            <select
               name="subCategory"
               value={formData.subCategory}
               onChange={handleChange}
-            />
+              disabled={!formData.category}
+              className={`w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500 ${!formData.category ? "bg-gray-100 cursor-not-allowed" : ""}`}
+            >
+              <option value="">{formData.category ? "None (Optional)" : "Select Main Category First"}</option>
+              {subCategories.map(sub => (
+                <option key={sub._id} value={sub._id}>
+                  {sub.name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <InputField
-            label="Tags (comma separated)"
-            name="tags"
-            value={formData.tags}
-            onChange={handleChange}
-          />
+          <InputField label="Tags (comma separated)" name="tags" value={formData.tags} onChange={handleChange} placeholder="organic, vegan, premium" />
+          <InputField label="Discount (%)" name="discount" type="number" value={formData.discount || "0"} onChange={handleChange} />
 
-          {/* ---------- VARIANTS ---------- */}
+          {/* Additional Info */}
           <div className="border border-gray-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Variants</h2>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h2>
+            <InputField label="Skin Type" name="additionalInfo.skinType" value={formData.additionalInfo.skinType} onChange={handleChange} />
+            <InputField label="Shelf Life (months)" name="additionalInfo.shelfLife" type="number" value={formData.additionalInfo.shelfLife} onChange={handleChange} />
+            <TextAreaField label="Usage Instructions" name="additionalInfo.usageInstructions" value={formData.additionalInfo.usageInstructions} onChange={handleChange} />
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 mb-4">
-              <select
-                value={variant.size}
-                onChange={(e) => setVariant({ ...variant, size: e.target.value })}
-                className="border rounded-lg p-3"
-              >
-                <option value="">Size</option>
-                <option>Small</option>
-                <option>Medium</option>
-                <option>Large</option>
-                <option>XL</option>
-              </select>
-
-              <input
-                type="text"
-                placeholder="Color"
-                value={variant.color}
-                onChange={(e) => setVariant({ ...variant, color: e.target.value })}
-                className="border rounded-lg p-3"
-              />
-
-              <input
-                type="number"
-                placeholder="Price"
-                value={variant.price}
-                onChange={(e) => setVariant({ ...variant, price: e.target.value })}
-                className="border rounded-lg p-3"
-              />
-
-              <input
-                type="number"
-                placeholder="Stock"
-                value={variant.stockQty}
-                onChange={(e) => setVariant({ ...variant, stockQty: e.target.value })}
-                className="border rounded-lg p-3"
-              />
-
-              <select
-                value={variant.packaging}
-                onChange={(e) => setVariant({ ...variant, packaging: e.target.value })}
-                className="border rounded-lg p-3"
-              >
-                <option>Bottle</option>
-                <option>Box</option>
-                <option>Tube</option>
-              </select>
+          {/* Variants */}
+          <div className="border border-gray-200 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Add Variant</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 mb-4">
+              <input type="text" placeholder="Size/Measurement" value={variant.size} onChange={e => handleVariantChange("size", e.target.value)} className="border border-gray-300 rounded-lg p-3" />
+              <input type="text" placeholder="Color" value={variant.color} onChange={e => handleVariantChange("color", e.target.value)} className="border border-gray-300 rounded-lg p-3" />
+              <input type="number" placeholder="Price" value={variant.price} onChange={e => handleVariantChange("price", e.target.value)} className="border border-gray-300 rounded-lg p-3" />
+              <input type="number" placeholder="Stock Qty" value={variant.stockQty} onChange={e => handleVariantChange("stockQty", e.target.value)} className="border border-gray-300 rounded-lg p-3" />
+              <button type="button" onClick={addVariant} className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition">
+                + Add
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={addVariant}
-              className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition text-sm"
-            >
-              + Add Variant
-            </button>
-
             {formData.variants.length > 0 && (
-              <div className="mt-4 space-y-2">
-                {formData.variants.map((v, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between items-center bg-gray-100 px-4 py-2 rounded-lg text-sm"
-                  >
-                    <span>
-                      {v.size} / {v.color} – ₹{v.price} ({v.stockQty} in stock, {v.packaging})
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeVariant(i)}
-                      className="text-red-600 hover:underline"
-                    >
+              <div className="space-y-2 mt-4">
+                {formData.variants.map((v, idx) => (
+                  <div key={idx} className="flex justify-between items-center bg-gray-100 px-4 py-2 rounded-lg">
+                    <span>{v.size} | {v.color} - ₹{v.price} (Stock: {v.stockQty})</span>
+                    <button type="button" onClick={() => removeVariant(idx)} className="text-red-600 hover:underline">
                       Remove
                     </button>
                   </div>
@@ -449,88 +440,35 @@ export default function EditProduct() {
             )}
           </div>
 
-          {/* ---------- FLAGS ---------- */}
+          {/* Checkboxes */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {[
-              ["isHotProduct", "Hot Product"],
               ["isFeatured", "Featured"],
+              ["isHotProduct", "Hot Product"],
               ["isBestSeller", "Best Seller"],
-            ].map(([k, l]) => (
-              <label key={k} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name={k}
-                  checked={formData[k] || false}
-                  onChange={handleChange}
-                  className="h-5 w-5 text-orange-500"
-                />
-                <span>{l}</span>
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-center gap-2">
+                <input type="checkbox" name={key} checked={formData[key]} onChange={handleChange} className="h-5 w-5 text-orange-500 focus:ring-orange-500" />
+                <span className="text-gray-700">{label}</span>
               </label>
             ))}
           </div>
 
-          {/* ---------- ADDITIONAL INFO (matches your API) ---------- */}
-          <div className="border border-gray-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              Additional Info
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <InputField
-                label="Skin Type"
-                name="additionalInfo.skinType"
-                value={formData.additionalInfo?.skinType || ""}
-                onChange={handleChange}
-              />
-              <InputField
-                label="Shelf Life (months)"
-                name="additionalInfo.shelfLife"
-                type="number"
-                value={formData.additionalInfo?.shelfLife || ""}
-                onChange={handleChange}
-              />
-              <TextAreaField
-                label="Usage Instructions"
-                name="additionalInfo.usageInstructions"
-                value={formData.additionalInfo?.usageInstructions || ""}
-                onChange={handleChange}
-              />
-            </div>
+          {/* Status */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select name="status" value={formData.status} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
           </div>
 
-          {/* ---------- PRICE / DISCOUNT / STATUS ---------- */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <InputField
-              label="Price"
-              name="price"
-              type="number"
-              value={formData.price}
-              onChange={handleChange}
-            />
-            <InputField
-              label="Discount (%)"
-              name="discount"
-              type="number"
-              value={formData.discount}
-              onChange={handleChange}
-            />
-            <SelectField
-              label="Status"
-              name="status"
-              value={formData.status}
-              options={["Active", "Inactive"]}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* ---------- SUBMIT ---------- */}
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-3 rounded-lg text-white font-semibold transition ${
-              loading ? "bg-gray-400" : "bg-orange-600 hover:bg-orange-700"
-            }`}
+            className={`w-full py-3 rounded-lg text-white font-semibold transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-orange-600 hover:bg-orange-700"}`}
           >
-            {loading ? "Updating..." : "Save Changes"}
+            {loading ? "Saving..." : "Update Product"}
           </button>
         </form>
       </div>
@@ -538,9 +476,7 @@ export default function EditProduct() {
   );
 }
 
-/* --------------------------------------------------------------
-   REUSABLE FIELD COMPONENTS
-   -------------------------------------------------------------- */
+/* Helper Components (same as AddProductForm) */
 const InputField = ({ label, name, value, onChange, type = "text", placeholder }) => (
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -550,38 +486,21 @@ const InputField = ({ label, name, value, onChange, type = "text", placeholder }
       value={value ?? ""}
       onChange={onChange}
       placeholder={placeholder}
-      className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500"
+      className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
     />
   </div>
 );
 
-const TextAreaField = ({ label, name, value, onChange }) => (
+const TextAreaField = ({ label, name, value, onChange, placeholder }) => (
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
     <textarea
       name={name}
       value={value ?? ""}
       onChange={onChange}
+      placeholder={placeholder}
       rows={4}
-      className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500"
+      className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
     />
-  </div>
-);
-
-const SelectField = ({ label, name, value, options, onChange }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-    <select
-      name={name}
-      value={value ?? ""}
-      onChange={onChange}
-      className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500 bg-white"
-    >
-      {options.map((opt) => (
-        <option key={opt} value={opt}>
-          {opt}
-        </option>
-      ))}
-    </select>
   </div>
 );

@@ -10,32 +10,44 @@ const EditCategoryPage = () => {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [displayOrder, setDisplayOrder] = useState('');
+  const [displayOrder, setDisplayOrder] = useState('1');
   const [type, setType] = useState('Main');
   const [parentCategory, setParentCategory] = useState('');
-  const [images, setImages] = useState([]);           // new files
-  const [imagePreviews, setImagePreviews] = useState([]); // preview URLs
-  const [existingImages, setExistingImages] = useState([]);
+  const [desktopImage, setDesktopImage] = useState(null);
+  const [mobileImage, setMobileImage] = useState(null);
+  const [imagePreviews, setImagePreviews] = useState({
+    desktop: null,
+    mobile: null,
+  });
+  const [existingImages, setExistingImages] = useState({ desktop: null, mobile: null });
   const [mainCategories, setMainCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
-  const fileInputRef = useRef(null);
 
-  // Load category + main categories
+  // States for removing images
+  const [removeDesktopImage, setRemoveDesktopImage] = useState(false);
+  const [removeMobileImage, setRemoveMobileImage] = useState(false);
+
+  const desktopFileInputRef = useRef(null);
+  const mobileFileInputRef = useRef(null);
+
   useEffect(() => {
     const load = async () => {
       setFetching(true);
       try {
-        const [cat, parents] = await Promise.all([
-          getCategory(categoryId),
-          getMainCategories()
-        ]);
+        const [cat, parents] = await Promise.all([getCategory(categoryId), getMainCategories()]);
         setName(cat.name);
         setDescription(cat.description || '');
-        setDisplayOrder(cat.displayOrder || 0);
+        setDisplayOrder(cat.displayOrder || 1);
         setType(cat.type);
         setParentCategory(cat.parentCategory?._id || '');
-        setExistingImages(cat.image || []);
+
+        if (cat.image && cat.image.length > 0) {
+          setExistingImages({
+            desktop: cat.image[0], // Assuming first image is for desktop
+            mobile: cat.image[1],  // Assuming second image is for mobile
+          });
+        }
         setMainCategories(parents);
       } catch (err) {
         toast.error('Failed to load category');
@@ -46,40 +58,80 @@ const EditCategoryPage = () => {
     load();
   }, [categoryId]);
 
-  // Handle new image selection
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length > 2) {
-      toast.error('Maximum 2 images allowed');
-      return;
+  // Handle new image selection for desktop
+  const handleDesktopImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setDesktopImage(file);
+      setImagePreviews(prev => ({
+        ...prev,
+        desktop: URL.createObjectURL(file),
+      }));
     }
-    setImages(files);
-    const previews = files.map(f => URL.createObjectURL(f));
-    setImagePreviews(previews);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Remove new image
-  const removeNewImage = (idx) => {
-    setImages(prev => prev.filter((_, i) => i !== idx));
-    setImagePreviews(prev => {
-      URL.revokeObjectURL(prev[idx]);
-      return prev.filter((_, i) => i !== idx);
-    });
+  // Handle new image selection for mobile
+  const handleMobileImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setMobileImage(file);
+      setImagePreviews(prev => ({
+        ...prev,
+        mobile: URL.createObjectURL(file),
+      }));
+    }
   };
 
-  // Submit update
+  // Remove desktop image and reset the file input
+  const handleImageRemove = async (imageType) => {
+    try {
+      const imageUrl = imageType === 'desktop' ? existingImages.desktop : existingImages.mobile;
+
+      // Send request to backend to remove image
+      const res = await updateCategory(categoryId, {
+        removeDesktopImage: imageType === 'desktop' && imageUrl,
+        removeMobileImage: imageType === 'mobile' && imageUrl,
+      });
+
+      if (res.success) {
+        // Update local state to reflect that the image has been removed
+        if (imageType === 'desktop') {
+          setExistingImages(prev => ({ ...prev, desktop: null }));
+          setRemoveDesktopImage(true);
+        } else {
+          setExistingImages(prev => ({ ...prev, mobile: null }));
+          setRemoveMobileImage(true);
+        }
+        toast.success('Image removed successfully');
+      } else {
+        toast.error('Failed to remove image');
+      }
+    } catch (error) {
+      console.error('Error removing image:', error);
+      toast.error('Error removing image');
+    }
+  };
+
+  // Submit the update
   const handleUpdate = async () => {
     if (!name) return toast.error('Name is required');
-    if (images.length > 0 && images.length !== 2) return toast.error('Replace with exactly 2 images');
+    if (!desktopImage && !existingImages.desktop && !removeDesktopImage) return toast.error('Desktop image is required');
+    if (!mobileImage && !existingImages.mobile && !removeMobileImage) return toast.error('Mobile image is required');
 
     const formData = new FormData();
     formData.append('name', name);
     formData.append('description', description);
-    formData.append('displayOrder', displayOrder || 0);
+    formData.append('displayOrder', displayOrder || 1);
     formData.append('type', type);
     if (type === 'Sub' && parentCategory) formData.append('parentCategory', parentCategory);
-    images.forEach(f => formData.append('images', f));
+
+    // Append images if selected
+    if (desktopImage) formData.append('desktopImage', desktopImage);
+    if (mobileImage) formData.append('mobileImage', mobileImage);
+
+    // Flags for removing images
+    if (removeDesktopImage && existingImages.desktop) formData.append('removeDesktopImage', true);
+    if (removeMobileImage && existingImages.mobile) formData.append('removeMobileImage', true);
 
     try {
       setLoading(true);
@@ -105,7 +157,7 @@ const EditCategoryPage = () => {
         <h1 className="text-2xl font-semibold mb-6">Edit Category</h1>
 
         <div className="space-y-6">
-          {/* Name */}
+          {/* Category Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700">Category Name</label>
             <input
@@ -134,14 +186,14 @@ const EditCategoryPage = () => {
             <input
               type="number"
               value={displayOrder}
-              onChange={(e) => setDisplayOrder(e.target.value)}
+              onChange={(e) => setDisplayOrder(Math.max(1, e.target.value))}
               className="w-full mt-2 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          {/* Type */}
+          {/* Category Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Category Type</label>
             <div className="flex space-x-6">
               <label className="flex items-center">
                 <input
@@ -168,7 +220,7 @@ const EditCategoryPage = () => {
             </div>
           </div>
 
-          {/* Parent Dropdown */}
+          {/* Parent Category Dropdown */}
           {type === 'Sub' && (
             <div>
               <label className="block text-sm font-medium text-gray-700">Parent Category</label>
@@ -186,52 +238,101 @@ const EditCategoryPage = () => {
           )}
 
           {/* Existing Images */}
-          {existingImages.length > 0 && images.length === 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Current Images</label>
-              <div className="flex gap-3 mt-2">
-                {existingImages.map((url, i) => (
-                  <img key={i} src={url} alt="current" className="w-24 h-24 object-cover rounded border shadow" />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Replace Images */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Replace Images (optional – exactly 2)
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Existing Images</label>
+            <div className="flex gap-3 mt-2">
+              {existingImages.desktop && (
+                <div className="relative">
+                  <img
+                    src={existingImages.desktop}
+                    alt="Desktop Preview"
+                    className="w-24 h-24 object-cover rounded border shadow"
+                  />
+                  <span
+                    className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs cursor-pointer"
+                    onClick={() => handleImageRemove('desktop')}
+                  >
+                    X
+                  </span>
+                </div>
+              )}
+              {existingImages.mobile && (
+                <div className="relative">
+                  <img
+                    src={existingImages.mobile}
+                    alt="Mobile Preview"
+                    className="w-24 h-24 object-cover rounded border shadow"
+                  />
+                  <span
+                    className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs cursor-pointer"
+                    onClick={() => handleImageRemove('mobile')}
+                  >
+                    X
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop Image Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Desktop Image</label>
             <input
-              ref={fileInputRef}
+              ref={desktopFileInputRef}
               type="file"
               accept="image/*"
-              multiple
-              onChange={handleImageChange}
+              onChange={handleDesktopImageChange}
               className="w-full mt-2 p-3 border border-gray-300 rounded-md"
             />
-            {imagePreviews.length > 0 && (
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                {imagePreviews.map((url, i) => (
-                  <div key={i} className="relative group">
-                    <img src={url} alt="new" className="w-full h-32 object-cover rounded-lg border shadow" />
-                    <button
-                      onClick={() => removeNewImage(i)}
-                      className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
-                    >
-                      X
-                    </button>
-                  </div>
-                ))}
+            {imagePreviews.desktop && (
+              <div className="relative mt-3">
+                <img
+                  src={imagePreviews.desktop}
+                  alt="Desktop Preview"
+                  className="w-32 h-32 object-cover rounded-lg border shadow"
+                />
+                <span
+                  className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs cursor-pointer"
+                  onClick={() => handleImageRemove('desktop')}
+                >
+                  X
+                </span>
               </div>
             )}
           </div>
 
-          {/* Submit */}
+          {/* Mobile Image Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Mobile Image</label>
+            <input
+              ref={mobileFileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleMobileImageChange}
+              className="w-full mt-2 p-3 border border-gray-300 rounded-md"
+            />
+            {imagePreviews.mobile && (
+              <div className="relative mt-3">
+                <img
+                  src={imagePreviews.mobile}
+                  alt="Mobile Preview"
+                  className="w-32 h-32 object-cover rounded-lg border shadow"
+                />
+                <span
+                  className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs cursor-pointer"
+                  onClick={() => handleImageRemove('mobile')}
+                >
+                  X
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Submit Button */}
           <div className="mt-6">
             <button
               onClick={handleUpdate}
-              disabled={loading}
+              disabled={loading || (!desktopImage && !existingImages.desktop && !removeDesktopImage) || (!mobileImage && !existingImages.mobile && !removeMobileImage)}
               className="w-full bg-blue-600 text-white py-3 px-6 rounded-md hover:bg-blue-700 disabled:opacity-50 transition"
             >
               {loading ? 'Updating...' : 'Update Category'}

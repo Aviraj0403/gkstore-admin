@@ -124,16 +124,22 @@ const AddCategoryForm = () => {
           </div>
 
           {/* Display Order */}
-          <div>
-            <label htmlFor="displayOrder" className="block text-sm font-medium text-gray-700">Display Order</label>
-            <input
-              type="number"
-              id="displayOrder"
-              value={displayOrder}
-              onChange={(e) => setDisplayOrder(e.target.value)}
-              className="w-full mt-2 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
+        
+<div>
+  <label htmlFor="displayOrder" className="block text-sm font-medium text-gray-700">Display Order</label>
+  <input
+    type="number"
+    id="displayOrder"
+    value={displayOrder}
+    onChange={(e) => {
+      // Get the value and ensure it is greater than 0 (default to 1 if invalid)
+      const value = e.target.value === '' ? 0 : Math.max(0, e.target.value); // Prevent zero or negative values
+      setDisplayOrder(value);
+    }}
+    className="w-full mt-2 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+  />
+</div>
+
 
           {/* Category Type (Main / Sub) */}
           <div>
