@@ -25,7 +25,7 @@ export const deleteProduct = async (id) => {
 
 /* ---------- SINGLE ---------- */
 export const getProduct = async (id) => {
-  const res = await Axios.get(`/products/getAdminProduct/${id}`);
+  const res = await Axios.get(`/products/getSingleProduct/${id}`);
   return res.data;               // { success, product }
 };
 
