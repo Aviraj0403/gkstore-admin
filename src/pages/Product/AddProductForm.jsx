@@ -413,14 +413,21 @@ export default function AddProductForm() {
           />
 
           {/* Discount */}
-          <InputField
-            label="Discount (%)"
-            name="discount"
-            type="number"
-            value={formData.discount || "0"}
-            onChange={handleChange}
-            placeholder="e.g. 10"
-          />
+      <InputField
+  label="Discount (%)"
+  name="discount"
+  type="number"
+  value={formData.discount || "0"}
+  onChange={(e) => {
+    const value = e.target.value;
+    const numericValue = Math.max(0, parseFloat(value));  // Ensure non-negative value
+    handleChange({
+      target: { name: "discount", value: numericValue.toString() }
+    });
+  }}
+  placeholder="e.g. 10"
+/>
+
 
           {/* Additional Info */}
           <div className="border border-gray-200 rounded-xl p-6">

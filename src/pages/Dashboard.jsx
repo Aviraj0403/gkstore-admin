@@ -559,13 +559,13 @@ export default function Dashboard() {
 
                     {/* Items */}
                     <div>
-                      <h5 className="text-sm font-semibold text-gray-700 mb-1">Dishes:</h5>
+                      <h5 className="text-sm font-semibold text-gray-700 mb-1">Items:</h5>
                       <ul className="list-disc list-inside max-h-20 sm:max-h-24 overflow-auto text-xs sm:text-sm text-gray-600">
                         {order?.items?.length > 0 ? (
                           order.items.map((item, i) => (
                             <li key={i}>
-                              {item?.selectedVariant?.name || item?.food?.name || 'Unknown'} - {item?.quantity || 0} × ₹
-                              {item?.selectedVariant?.price || item?.food?.price || 0}
+                              {item?.selectedVariant?.name || item?.product?.name || 'Unknown'} - {item?.quantity || 0} × ₹
+                              {item?.selectedVariant?.price || item?.product?.price || 0}
                             </li>
                           ))
                         ) : (
