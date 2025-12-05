@@ -32,7 +32,11 @@ const CategoryList = () => {
         sortOrder,
       });
       if (response && response.success) {
-        setCategories(response.categories || []);
+        const sanitizedCategories = response.categories.map((cat) => ({
+          ...cat,
+          image: Array.isArray(cat.image) ? cat.image : [],  // Ensure `cat.image` is an array
+        }));
+        setCategories(sanitizedCategories);
         setPagination(response.pagination || {});
       } else {
         toast.error('Failed to fetch categories');
@@ -45,6 +49,7 @@ const CategoryList = () => {
       setLoading(false);
     }
   };
+
 
   const handlePageChange = (newPage) => {
     if (newPage < 1 || (pagination.totalPages && newPage > pagination.totalPages)) return;
@@ -153,7 +158,7 @@ const CategoryList = () => {
                       className={`hover:bg-orange-50 transition ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                     >
                       {/* Images – show both */}
-                      <td className="px-6 py-4 text-sm">
+                      {/* <td className="px-6 py-4 text-sm">
                         <div className="flex gap-1">
                           {cat.image.map((url, i) => (
                             <img
@@ -164,7 +169,30 @@ const CategoryList = () => {
                             />
                           ))}
                         </div>
+                      </td> */}
+                      <td className="px-6 py-4 text-sm">
+                        <div className="flex gap-1">
+                          {/* Ensure cat.image is not null, undefined, or not an array */}
+                          {Array.isArray(cat.image) && cat.image.length > 0 ? (
+                            cat.image.map((url, i) => (
+                              <img
+                                key={i}
+                                src={url}
+                                alt={`${cat.name} image ${i + 1}`}
+                                className="w-12 h-12 object-cover rounded border"
+                              />
+                            ))
+                          ) : (
+                            // Fallback image if cat.image is invalid
+                            <img
+                              src="path/to/default-image.jpg"  // Replace with the actual path to the fallback image
+                              alt="Default"
+                              className="w-12 h-12 object-cover rounded border"
+                            />
+                          )}
+                        </div>
                       </td>
+
 
                       <td className="px-6 py-4 text-sm font-medium text-gray-800">{cat.name}</td>
 
@@ -178,11 +206,10 @@ const CategoryList = () => {
 
                       <td className="px-6 py-4 text-sm">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${
-                            cat.isActive
+                          className={`px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${cat.isActive
                               ? 'bg-green-100 text-green-600 border border-green-200'
                               : 'bg-red-100 text-red-600 border border-red-200'
-                          }`}
+                            }`}
                         >
                           {cat.isActive ? 'Active' : 'Inactive'}
                         </span>

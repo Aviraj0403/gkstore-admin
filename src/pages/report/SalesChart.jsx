@@ -1,33 +1,88 @@
-// SalesChart.js
-import React from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import React, { useEffect, useState } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
+import Axios from "../../utils/Axios";
 
-// Sample data for the chart (Sales Data)
-const salesData = [
-  { name: "Jan", sales: 4000 },
-  { name: "Feb", sales: 4500 },
-  { name: "Mar", sales: 5500 },
-  { name: "Apr", sales: 4700 },
-  { name: "May", sales: 6000 },
-  { name: "Jun", sales: 7000 },
-  { name: "Jul", sales: 6500 },
-  { name: "Aug", sales: 7200 },
-  { name: "Sep", sales: 6800 },
-  { name: "Oct", sales: 5900 },
-  { name: "Nov", sales: 7500 },
-  { name: "Dec", sales: 8000 },
-];
+// Custom Tooltip
+const CustomTooltip = ({ payload, label, active }) => {
+  if (active && payload && payload.length) {
+    const { totalSales } = payload[0].payload;
+    // console.log("Tooltip Payload:", payload);
+    return (
+      <div className="custom-tooltip bg-white shadow-md p-3 rounded-lg">
+        <p className="label text-gray-700">Month: {label}</p>
+        <p className="intro text-gray-500">Sales: ₹{totalSales}</p>
+      </div>
+    );
+  }
+  return null;
+};
 
 const SalesChart = () => {
+  const [salesData, setSalesData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchSalesData = async () => {
+      try {
+        // Make the API call to fetch sales data from your backend
+        const response = await Axios.get('/orders/sales-graph');  // Replace with your actual API endpoint
+        if (response.data.success) {
+          setSalesData(response.data.data);
+        }
+      } catch (err) {
+        setError("Error fetching sales data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSalesData();
+  }, []);
+
+  if (loading) {
+    return <div>Loading sales data...</div>;
+  }
+
+  if (error) {
+    return <div>{error}</div>;
+  }
+
   return (
     <ResponsiveContainer width="100%" height={350}>
       <LineChart data={salesData}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Line type="monotone" dataKey="sales" stroke="#3490dc" strokeWidth={3} dot={{ r: 5 }} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+        <XAxis
+          dataKey="month"
+          tick={{ fill: "#6b7280" }}
+          tickLine={{ stroke: "#e5e7eb" }}
+        />
+        <YAxis
+          tick={{ fill: "#6b7280" }}
+          tickLine={{ stroke: "#e5e7eb" }}
+          axisLine={{ stroke: "#e5e7eb" }}
+        />
+        <Tooltip content={<CustomTooltip />} />
+        <Legend verticalAlign="top" height={36} />
+        <ReferenceLine y={7000} label="Target" stroke="#f56565" strokeWidth={2} />
+        <Line
+          type="monotone"
+          dataKey="totalSales"
+          stroke="#4C9F70" // Green color for sales line
+          strokeWidth={3}
+          dot={{ r: 6, fill: "#4C9F70", stroke: "#ffffff", strokeWidth: 2 }}
+          activeDot={{ r: 8 }}
+        />
       </LineChart>
     </ResponsiveContainer>
   );

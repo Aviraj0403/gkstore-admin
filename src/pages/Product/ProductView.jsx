@@ -54,7 +54,7 @@ const ProductView = () => {
   };
 
   const handleEditProduct = () => {
-    navigate(`/admin/edit-product/${productId}`);
+    navigate(`/admin/editProduct/${productId}`);
   };
 
   if (loading) {
