@@ -46,7 +46,6 @@ export const getMonthlyStats = async () => {
   }
 };
 
-
 export const getTotalUsers = async () => {
   try {
     const response = await axios.get('/users/gettotalusers');
@@ -56,12 +55,29 @@ export const getTotalUsers = async () => {
   }
 };
 
-
 export const getTotalProducts = async () => {
   try {
     const response = await axios.get('/products/getTotalProduct');
     return response.data.totalProduct;  // Assuming the response contains { success: true, totalProducts: <number> }
   } catch (err) {
     console.error('Error fetching total products:', err);
+  }
+};
+
+export const redisCache = async () => {
+  try {
+    const response = await axios.post('/redis/clear-redis');
+    return response.data;
+  } catch (err) {
+    console.error('Error triggering Redis cache:', err);
+  }
+};
+
+export const clearRedisCache = async () => {
+  try {
+    const response = await axios.delete('/redis/clear-redis-cache');
+    return response.data;
+  } catch (err) {
+    console.error('Error clearing Redis cache:', err);
   }
 };
