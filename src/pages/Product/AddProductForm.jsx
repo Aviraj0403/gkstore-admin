@@ -93,7 +93,13 @@ export default function AddProductForm() {
   /* ------------------ HANDLERS ------------------ */
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-
+    if (name === "discount" && value < 0) {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: 1, // Set discount to 1 if the value is negative
+    }));
+    return; // Exit the function early to prevent further processing
+  }
     if (name === "category") {
       setFormData((prev) => ({
         ...prev,
@@ -413,20 +419,18 @@ export default function AddProductForm() {
           />
 
           {/* Discount */}
-      <InputField
+<InputField
   label="Discount (%)"
   name="discount"
   type="number"
-  value={formData.discount || "0"}
-  onChange={(e) => {
-    const value = e.target.value;
-    const numericValue = Math.max(0, parseFloat(value));  // Ensure non-negative value
-    handleChange({
-      target: { name: "discount", value: numericValue.toString() }
-    });
-  }}
+  min="0"       // Prevents input of numbers less than 0
+  max="100"     // Optional, if you want to limit the value to 100
+  step="0.01"   // Allows decimals
+  value={formData.discount}
+  onChange={handleChange}  // No custom parsing needed here
   placeholder="e.g. 10"
 />
+
 
 
           {/* Additional Info */}
@@ -532,9 +536,10 @@ export default function AddProductForm() {
           {/* Checkboxes */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {[
-              ["isFeatured", "Featured"],
-              ["isHotProduct", "Hot Product"],
+              // ["isFeatured", "Featured"],
+              // ["isHotProduct", "Hot Product"],
               ["isBestSeller", "Best Seller"],
+              ["isCombo", "Combo"],
             ].map(([key, label]) => (
               <label key={key} className="flex items-center gap-2">
                 <input
