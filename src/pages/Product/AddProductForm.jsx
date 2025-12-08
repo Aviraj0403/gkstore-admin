@@ -38,12 +38,12 @@ export default function AddProductForm() {
   const [subCategories, setSubCategories] = useState([]);
   const [variant, setVariant] = useState({
     size: "",
-    color: "",
+    color: [],
     price: "",
     stockQty: "",
     packaging: "",
   });
-
+  const [currentColor, setCurrentColor] = useState("");
   /* ------------------ FETCH CATEGORIES ------------------ */
   useEffect(() => {
     async function fetchCategories() {
@@ -94,12 +94,12 @@ export default function AddProductForm() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name === "discount" && value < 0) {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: 1, // Set discount to 1 if the value is negative
-    }));
-    return; // Exit the function early to prevent further processing
-  }
+      setFormData((prev) => ({
+        ...prev,
+        [name]: 1, // Set discount to 1 if the value is negative
+      }));
+      return; // Exit the function early to prevent further processing
+    }
     if (name === "category") {
       setFormData((prev) => ({
         ...prev,
@@ -120,48 +120,127 @@ export default function AddProductForm() {
     }
   };
 
-  const handleVariantChange = (field, val) => {
-    setVariant((prev) => ({ ...prev, [field]: val }));
+  // const handleVariantChange = (field, val) => {
+  //   setVariant((prev) => ({ ...prev, [field]: val }));
+  // };
+
+  // const addVariant = () => {
+  //   const { size, color, price, stockQty, packaging } = variant;
+
+  //   if (!size || !color || !price || isNaN(parseFloat(price))) {
+  //     toast.error("Size, Color, and Price are required.", {
+  //       style: { background: "#f97316", color: "#fff" },
+  //     });
+  //     return;
+  //   }
+
+  //   const alreadyExists = formData.variants.some(
+  //     (v) => v.size === size && v.color === color
+  //   );
+  //   if (alreadyExists) {
+  //     toast.error("Variant with this size & color already exists.", {
+  //       style: { background: "#f97316", color: "#fff" },
+  //     });
+  //     return;
+  //   }
+
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     variants: [
+  //       ...prev.variants,
+  //       {
+  //         size,
+  //         color,
+  //         price: parseFloat(price),
+  //         stockQty: parseInt(stockQty) || 0,
+  //         packaging,
+  //       },
+  //     ],
+  //   }));
+
+  //   setVariant({ size: "", color: "", price: "", stockQty: "", packaging: "Bottle" });
+  //   toast.success("Variant added!", {
+  //     style: { background: "#f97316", color: "#fff" },
+  //   });
+  // };
+
+  const addColorToVariant = () => {
+    if (!currentColor.trim()) return;
+
+    const normalized = currentColor.trim().toLowerCase();
+    if (variant.color.some(c => c.toLowerCase() === normalized)) {
+      toast.error("Color already added!");
+      return;
+    }
+
+    setVariant(prev => ({
+      ...prev,
+      color: [...prev.color, currentColor.trim()]
+    }));
+    setCurrentColor("");
   };
+  const removeColorFromVariant = (colorToRemove) => {
+    setVariant(prev => ({
+      ...prev,
+      color: prev.color.filter(c => c !== colorToRemove)
+    }));
+  };
+
 
   const addVariant = () => {
     const { size, color, price, stockQty, packaging } = variant;
 
-    if (!size || !color || !price || isNaN(parseFloat(price))) {
-      toast.error("Size, Color, and Price are required.", {
-        style: { background: "#f97316", color: "#fff" },
-      });
+    if (!size.trim()) {
+      toast.error("Size is required.");
+      return;
+    }
+    if (color.length === 0) {
+      toast.error("At least one color is required.");
+      return;
+    }
+    if (!price || isNaN(parseFloat(price))) {
+      toast.error("Valid price is required.");
       return;
     }
 
-    const alreadyExists = formData.variants.some(
-      (v) => v.size === size && v.color === color
+    // Check for duplicate variant (same size + same colors)
+    const alreadyExists = formData.variants.some(v =>
+      v.size === size &&
+      v.color.length === color.length &&
+      v.color.every(c => color.includes(c)) &&
+      color.every(c => v.color.includes(c))
     );
+
     if (alreadyExists) {
-      toast.error("Variant with this size & color already exists.", {
-        style: { background: "#f97316", color: "#fff" },
-      });
+      toast.error("This variant (size + colors) already exists.");
       return;
     }
 
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       variants: [
         ...prev.variants,
         {
-          size,
-          color,
+          size: size.trim(),
+          color: [...color], // copy array
           price: parseFloat(price),
           stockQty: parseInt(stockQty) || 0,
-          packaging,
+          packaging: packaging || "Bottle",
         },
       ],
     }));
 
-    setVariant({ size: "", color: "", price: "", stockQty: "", packaging: "Bottle" });
-    toast.success("Variant added!", {
-      style: { background: "#f97316", color: "#fff" },
+    // Reset variant form
+    setVariant({
+      size: "",
+      color: [],
+      price: "",
+      stockQty: "",
+      packaging: "Bottle",
     });
+    setCurrentColor("");
+
+    toast.success("Variant added successfully!");
   };
 
   const removeVariant = (index) => {
@@ -230,7 +309,9 @@ export default function AddProductForm() {
     // Append variants with indexed keys (exact match to backend)
     formData.variants.forEach((variant, index) => {
       fd.append(`variants[${index}][size]`, variant.size);
-      fd.append(`variants[${index}][color]`, variant.color);
+      variant.color.forEach((color) => {
+        fd.append(`variants[${index}][color][]`, color);
+      });
       fd.append(`variants[${index}][price]`, variant.price);
       fd.append(`variants[${index}][stockQty]`, variant.stockQty);
       fd.append(`variants[${index}][packaging]`, variant.packaging);
@@ -419,17 +500,17 @@ export default function AddProductForm() {
           />
 
           {/* Discount */}
-<InputField
-  label="Discount (%)"
-  name="discount"
-  type="number"
-  min="0"       // Prevents input of numbers less than 0
-  max="100"     // Optional, if you want to limit the value to 100
-  step="0.01"   // Allows decimals
-  value={formData.discount}
-  onChange={handleChange}  // No custom parsing needed here
-  placeholder="e.g. 10"
-/>
+          <InputField
+            label="Discount (%)"
+            name="discount"
+            type="number"
+            min="0"       // Prevents input of numbers less than 0
+            max="100"     // Optional, if you want to limit the value to 100
+            step="0.01"   // Allows decimals
+            value={formData.discount}
+            onChange={handleChange}  // No custom parsing needed here
+            placeholder="e.g. 10"
+          />
 
 
 
@@ -463,72 +544,168 @@ export default function AddProductForm() {
           </div>
 
           {/* Variants Section */}
-          <div className="border border-gray-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              Add Variant
+          {/* ==================== NEW & IMPROVED VARIANT SECTION ==================== */}
+          <div className="border border-gray-200 rounded-2xl p-6 lg:p-8 bg-white shadow-lg">
+            <h2 className="text-2xl font-bold text-gray-800 mb-8 flex items-center gap-3">
+              <span className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white text-sm">V</span>
+              Product Variants
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 mb-4">
-              <input
-                type="text"
-                placeholder="Size/ Measurement"
-                value={variant.size}
-                onChange={(e) => handleVariantChange("size", e.target.value)}
-                className="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500"
-              />
-              <input
-                type="text"
-                placeholder="Color"
-                value={variant.color}
-                onChange={(e) => handleVariantChange("color", e.target.value)}
-                className="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500"
-              />
+            {/* Variant Input Card */}
+            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-6 border border-orange-200">
 
-              <input
-                type="number"
-                placeholder="Price"
-                value={variant.price}
-                onChange={(e) => handleVariantChange("price", e.target.value)}
-                className="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500"
-              />
+              {/* Size + Price + Stock Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Size / Volume *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 100ml, 50g, Large"
+                    value={variant.size}
+                    onChange={(e) => setVariant(prev => ({ ...prev, size: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-4 focus:ring-orange-200 focus:border-orange-500 transition"
+                  />
+                </div>
 
-              <input
-                type="number"
-                placeholder="Stock Qty"
-                value={variant.stockQty}
-                onChange={(e) => handleVariantChange("stockQty", e.target.value)}
-                className="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500"
-              />
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Price (₹) *</label>
+                  <input
+                    type="number"
+                    placeholder="299"
+                    value={variant.price}
+                    onChange={(e) => setVariant(prev => ({ ...prev, price: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-4 focus:ring-orange-200 focus:border-orange-500"
+                  />
+                </div>
 
-              <button
-                type="button"
-                onClick={addVariant}
-                className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition"
-              >
-                + Add
-              </button>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Quantity</label>
+                  <input
+                    type="number"
+                    placeholder="100"
+                    value={variant.stockQty}
+                    onChange={(e) => setVariant(prev => ({ ...prev, stockQty: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-4 focus:ring-orange-200 focus:border-orange-500"
+                  />
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={addVariant}
+                    disabled={!variant.size || variant.color.length === 0 || !variant.price}
+                    className={`w-full py-3 rounded-xl font-bold text-white transition-all transform hover:scale-105 shadow-lg ${!variant.size || variant.color.length === 0 || !variant.price
+                        ? "bg-gray-300 cursor-not-allowed"
+                        : "bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                      }`}
+                  >
+                    Add Variant
+                  </button>
+                </div>
+              </div>
+
+              {/* Color Input Section */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Colors for this Variant *
+                </label>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="Type color name (e.g. Rose Gold, Navy Blue)"
+                    value={currentColor}
+                    onChange={(e) => setCurrentColor(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addColorToVariant())}
+                    className="flex-1 min-w-[200px] px-4 py-3 border border-gray-300 rounded-xl focus:ring-4 focus:ring-orange-200 focus:border-orange-500"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={addColorToVariant}
+                    className="px-8 py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition shadow-md"
+                  >
+                    + Add Color
+                  </button>
+                </div>
+
+                {/* Live Color Chips */}
+                {variant.color.length > 0 && (
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    {variant.color.map((col, i) => (
+                      <div
+                        key={i}
+                        className="group flex items-center gap-2 bg-white border-2 border-orange-300 rounded-2xl px-4 py-2 shadow-sm hover:shadow-md transition"
+                      >
+                        <div
+                          className="w-ml-1 w-6 h-6 rounded-full border-2 border-white shadow ring-1 ring-gray-300"
+                          style={{ backgroundColor: col.toLowerCase() }}
+                        />
+                        <span className="font-medium text-gray-800">{col}</span>
+                        <button
+                          onClick={() => removeColorFromVariant(col)}
+                          className="ml-2 text-red-500 hover:text-red-700 font-bold text-lg"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {variant.color.length === 0 && (
+                  <p className="mt-4 text-sm text-orange-600 font-medium">
+                    Add at least one color to enable "Add Variant" button
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Added Variants */}
+            {/* ==================== ADDED VARIANTS LIST ==================== */}
             {formData.variants.length > 0 && (
-              <div className="space-y-2 mt-4">
-                {formData.variants.map((v, idx) => (
-                  <div
-                    key={idx}
-                    className="flex justify-between items-center bg-gray-100 px-4 py-2 rounded-lg"
-                  >
-                    <span>
-                      {v.size} | {v.color} - ₹{v.price} (Stock: {v.stockQty})
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeVariant(idx)}
-                      className="text-red-600 hover:underline"
+              <div className="mt-10">
+                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                  <span>Added Variants ({formData.variants.length})</span>
+                </h3>
+
+                <div className="grid gap-4">
+                  {formData.variants.map((v, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:shadow-xl transition-shadow"
                     >
-                      Remove
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-4 text-lg font-bold text-gray-800">
+                          <span className="bg-white px-4 py-2 rounded-lg shadow">{v.size}</span>
+                          <span>₹{v.price}</span>
+                          <span className="text-gray-600 font-normal">• Stock: {v.stockQty || 0}</span>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {v.color.map((c, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border"
+                            >
+                              <span
+                                className="w-4 h-4 rounded-full ring-2 ring-white shadow"
+                                style={{ backgroundColor: c.toLowerCase() }}
+                              />
+                              <span className="text-sm font-medium">{c}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => removeVariant(idx)}
+                        className="self-start lg:self-center px-6 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition shadow-md"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
