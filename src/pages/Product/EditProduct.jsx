@@ -24,19 +24,20 @@ export default function EditProductForm() {
   const [loading, setLoading] = useState(false);
 
   // Images
-  const [existingImages, setExistingImages] = useState([]); // URLs from server
-  const [newImages, setNewImages] = useState([]);           // File objects
-  const [newPreviews, setNewPreviews] = useState([]);      // preview URLs
+  const [existingImages, setExistingImages] = useState([]); // from server (URLs)
+  const [newImages, setNewImages] = useState([]);           // new File objects
+  const [newPreviews, setNewPreviews] = useState([]);       // preview URLs
   const [removedImages, setRemovedImages] = useState([]);  // URLs to delete
 
-  // Variant temp state
+  // Temp variant state (for adding new)
   const [variant, setVariant] = useState({
     size: "",
-    color: "",
+    color: [],
     price: "",
     stockQty: "",
     packaging: "Bottle",
   });
+  const [currentColor, setCurrentColor] = useState("");
 
   /* ------------------ FETCH DATA ------------------ */
   useEffect(() => {
@@ -55,7 +56,6 @@ export default function EditProductForm() {
 
         const p = prodRes.product;
 
-        // Normalise data exactly like AddProductForm expects
         const normalized = {
           name: p.name || "",
           brand: p.brand || "",
@@ -73,19 +73,20 @@ export default function EditProductForm() {
             shelfLife: p.additionalInfo?.shelfLife || 12,
             usageInstructions: p.additionalInfo?.usageInstructions || "",
           },
-          variants: Array.isArray(p.variants) ? p.variants.map(v => ({
-            ...v,
-            price: v.price?.toString() || "",
-            stockQty: v.stockQty?.toString() || "0",
-          })) : [],
+          variants: Array.isArray(p.variants)
+            ? p.variants.map(v => ({
+                size: v.size || "",
+                color: Array.isArray(v.color) ? v.color : [v.color].filter(Boolean),
+                price: v.price?.toString() || "",
+                stockQty: v.stockQty?.toString() || "0",
+                packaging: v.packaging || "Bottle",
+              }))
+            : [],
         };
 
         setFormData(normalized);
         setExistingImages(p.pimages || []);
-
-        if (catRes.success && Array.isArray(catRes.categories)) {
-          setCategories(catRes.categories);
-        }
+        if (catRes.success) setCategories(catRes.categories || []);
       } catch (err) {
         toast.error("Failed to load product");
         console.error(err);
@@ -95,13 +96,12 @@ export default function EditProductForm() {
     if (productId) fetchData();
   }, [productId, navigate]);
 
-  // Load sub-categories when main category changes
   useEffect(() => {
     async function fetchSubCategories() {
       if (formData?.category) {
         try {
           const subs = await getSubCategories(formData.category);
-          setSubCategories(subs);
+          setSubCategories(subs || []);
         } catch {
           toast.error("Failed to load sub-categories");
         }
@@ -109,19 +109,20 @@ export default function EditProductForm() {
         setSubCategories([]);
       }
     }
-    fetchSubCategories();
+    if (formData) fetchSubCategories();
   }, [formData?.category]);
 
   /* ------------------ HANDLERS ------------------ */
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
+    if (name === "discount" && value < 0) {
+      setFormData(prev => ({ ...prev, discount: 0 }));
+      return;
+    }
+
     if (name === "category") {
-      setFormData(prev => ({
-        ...prev,
-        category: value,
-        subCategory: "",
-      }));
+      setFormData(prev => ({ ...prev, category: value, subCategory: "" }));
     } else if (name.startsWith("additionalInfo.")) {
       const field = name.split(".")[1];
       setFormData(prev => ({
@@ -136,31 +137,47 @@ export default function EditProductForm() {
     }
   };
 
-  const handleVariantChange = (field, val) => {
-    setVariant(prev => ({ ...prev, [field]: val }));
+  const addColorToVariant = () => {
+    if (!currentColor.trim()) return;
+    const normalized = currentColor.trim().toLowerCase();
+    if (variant.color.some(c => c.toLowerCase() === normalized)) {
+      toast.error("Color already added!");
+      return;
+    }
+    setVariant(prev => ({ ...prev, color: [...prev.color, currentColor.trim()] }));
+    setCurrentColor("");
+  };
+
+  const removeColorFromVariant = (colorToRemove) => {
+    setVariant(prev => ({
+      ...prev,
+      color: prev.color.filter(c => c !== colorToRemove),
+    }));
   };
 
   const addVariant = () => {
     const { size, color, price, stockQty, packaging } = variant;
 
-    if (!size || !color || !price || isNaN(parseFloat(price))) {
-      toast.error("Size, Color, and Price are required.");
-      return;
-    }
+    if (!size.trim()) return toast.error("Size is required.");
+    if (color.length === 0) return toast.error("At least one color is required.");
+    if (!price || isNaN(parseFloat(price))) return toast.error("Valid price is required.");
 
-    const exists = formData.variants.some(v => v.size === size && v.color === color);
-    if (exists) {
-      toast.error("Variant with this size & color already exists.");
-      return;
-    }
+    const alreadyExists = formData.variants.some(v =>
+      v.size === size.trim() &&
+      v.color.length === color.length &&
+      v.color.every(c => color.includes(c)) &&
+      color.every(c => v.color.includes(c))
+    );
+
+    if (alreadyExists) return toast.error("This variant (size + colors) already exists.");
 
     setFormData(prev => ({
       ...prev,
       variants: [
         ...prev.variants,
         {
-          size,
-          color,
+          size: size.trim(),
+          color: [...color],
           price: parseFloat(price),
           stockQty: parseInt(stockQty) || 0,
           packaging: packaging || "Bottle",
@@ -168,7 +185,8 @@ export default function EditProductForm() {
       ],
     }));
 
-    setVariant({ size: "", color: "", price: "", stockQty: "", packaging: "Bottle" });
+    setVariant({ size: "", color: [], price: "", stockQty: "", packaging: "Bottle" });
+    setCurrentColor("");
     toast.success("Variant added!");
   };
 
@@ -182,13 +200,11 @@ export default function EditProductForm() {
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
-    const total = existingImages.length - removedImages.length + newImages.length + files.length;
-
-    if (total > 5) {
-      toast.error("Maximum 5 images allowed in total.");
+    const totalImages = existingImages.length - removedImages.length + newImages.length + files.length;
+    if (totalImages > 5) {
+      toast.error("Maximum 5 images allowed.");
       return;
     }
-
     const previews = files.map(f => URL.createObjectURL(f));
     setNewImages(prev => [...prev, ...files]);
     setNewPreviews(prev => [...prev, ...previews]);
@@ -206,10 +222,10 @@ export default function EditProductForm() {
   };
 
   const removeAllImages = () => {
+    setRemovedImages(prev => [...prev, ...existingImages]);
     setExistingImages([]);
     setNewImages([]);
     setNewPreviews([]);
-    setRemovedImages(prev => [...prev, ...existingImages]);
     toast.success("All images cleared!");
   };
 
@@ -217,15 +233,9 @@ export default function EditProductForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if ((existingImages.length + newImages.length) === 0) {
-      toast.error("At least one image is required.");
-      return;
-    }
-
-    if (formData.variants.length === 0) {
-      toast.error("At least one variant is required.");
-      return;
-    }
+    const totalImages = existingImages.length + newImages.length;
+    if (totalImages === 0) return toast.error("At least one image is required.");
+    if (formData.variants.length === 0) return toast.error("At least one variant is required.");
 
     setLoading(true);
     const fd = new FormData();
@@ -236,22 +246,21 @@ export default function EditProductForm() {
         fd.append(key, val);
       }
     });
-
     fd.append("tags", formData.tags);
     fd.append("additionalInfo", JSON.stringify(formData.additionalInfo));
 
-    // Variants (indexed like in Add form)
+    // Variants
     formData.variants.forEach((v, i) => {
       fd.append(`variants[${i}][size]`, v.size);
-      fd.append(`variants[${i}][color]`, v.color);
+      v.color.forEach(col => fd.append(`variants[${i}][color][]`, col));
       fd.append(`variants[${i}][price]`, v.price);
       fd.append(`variants[${i}][stockQty]`, v.stockQty);
-      fd.append(`variants[${i}][packaging]`, v.packaging || "Bottle");
+      fd.append(`variants[${i}][packaging]`, v.packaging);
     });
 
     // Images
     newImages.forEach(file => fd.append("pimages", file));
-    if (removedImages.length) {
+    if (removedImages.length > 0) {
       fd.append("removedImages", JSON.stringify(removedImages));
     }
 
@@ -261,7 +270,7 @@ export default function EditProductForm() {
         toast.success("Product updated successfully!");
         navigate("/admin/adminProducts");
       } else {
-        toast.error(res.message || "Failed to update product");
+        toast.error(res.message || "Update failed");
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Server error");
@@ -270,120 +279,115 @@ export default function EditProductForm() {
     }
   };
 
-  if (!formData) return <div className="text-center py-20">Loading...</div>;
+  if (!formData) return <div className="text-center py-20 text-xl">Loading product...</div>;
 
-  /* ------------------ RENDER ------------------ */
   return (
     <div className="min-h-screen bg-orange-50 flex items-center justify-center p-4">
       <ToastContainer />
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl p-8">
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">
-          Edit Product
-        </h1>
+      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl p-8">
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">Edit Product</h1>
 
         {/* Image Upload Section */}
+                {/* Image Upload Section */}
         <div className="mb-8">
           <div className="bg-orange-100 border-2 border-dashed border-orange-400 rounded-xl p-6 text-center">
-            {(existingImages.length > 0 || newPreviews.length > 0) ? (
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-4">
-                {existingImages
-                  .filter(img => !removedImages.includes(img))
-                  .map((src, i) => (
-                    <div key={`exist-${i}`} className="relative">
-                      <img
-                        src={src}
-                        alt="Existing"
-                        className="w-full h-32 object-cover rounded-lg shadow-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeExistingImage(src)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold"
-                      >
-                        ×
-                      </button>
+            
+            {/* Calculate total current images */}
+            {(() => {
+              const totalImages = existingImages.filter(img => !removedImages.includes(img)).length + newPreviews.length;
+              return (
+                <>
+                  {totalImages > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-4">
+                      {existingImages
+                        .filter(img => !removedImages.includes(img))
+                        .map((src, i) => (
+                          <div key={`exist-${i}`} className="relative group">
+                            <img src={src} alt="" className="w-full h-32 object-cover rounded-lg shadow-sm" />
+                            <button
+                              type="button"
+                              onClick={() => removeExistingImage(src)}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-lg font-bold opacity-0 group-hover:opacity-100 transition"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      {newPreviews.map((src, i) => (
+                        <div key={`new-${i}`} className="relative group">
+                          <img src={src} alt="" className="w-full h-32 object-cover rounded-lg shadow-sm" />
+                          <button
+                            type="button"
+                            onClick={() => removeNewImage(i)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-lg font-bold opacity-0 group-hover:opacity-100 transition"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                {newPreviews.map((src, i) => (
-                  <div key={`new-${i}`} className="relative">
-                    <img
-                      src={src}
-                      alt="New"
-                      className="w-full h-32 object-cover rounded-lg shadow-sm"
-                    />
+                  ) : (
+                    <p className="text-gray-600">No images</p>
+                  )}
+
+                  {totalImages > 0 && (
                     <button
                       type="button"
-                      onClick={() => removeNewImage(i)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold"
+                      onClick={removeAllImages}
+                      className="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
                     >
-                      ×
+                      Remove All Images
                     </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-600">No images</p>
-            )}
+                  )}
 
-            {(existingImages.length - removedImages.length + newImages.length) > 0 && (
-              <button
-                type="button"
-                onClick={removeAllImages}
-                className="mt-4 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
-              >
-                Remove All Images
-              </button>
-            )}
+                  {totalImages < 5 && (
+                    <div className="mt-4">
+                      <input
+                        type="file"
+                        id="edit-image-upload"
+                        multiple
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="edit-image-upload"
+                        className="bg-orange-500 text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-orange-600 transition font-semibold"
+                      >
+                        Upload More Images ({5 - totalImages} left)
+                      </label>
+                    </div>
+                  )}
 
-            {(existingImages.length - removedImages.length + newImages.length) < 5 && (
-              <div className="mt-4">
-                <input
-                  type="file"
-                  id="edit-image-upload"
-                  multiple
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="edit-image-upload"
-                  className="bg-orange-500 text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-orange-600 transition"
-                >
-                  Upload More Images (max 5 total)
-                </label>
-              </div>
-            )}
+                  {totalImages >= 5 && (
+                    <p className="mt-4 text-sm text-orange-600 font-medium">
+                      Maximum 5 images reached
+                    </p>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          <InputField label="Name *" name="name" value={formData.name} onChange={handleChange} placeholder="Enter product name" />
-          <InputField label="Brand *" name="brand" value={formData.brand} onChange={handleChange} placeholder="e.g. L'Oréal, Himalaya" />
-          <TextAreaField label="Description *" name="description" value={formData.description} onChange={handleChange} placeholder="Describe the product" />
 
-          {/* Category */}
+          {/* Basic Fields */}
+          <InputField label="Name *" name="name" value={formData.name} onChange={handleChange} />
+          <InputField label="Brand *" name="brand" value={formData.brand} onChange={handleChange} />
+          <TextAreaField label="Description *" name="description" value={formData.description} onChange={handleChange} />
+
+          {/* Category & Subcategory */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
-            <select
-              name="category"
-              value={formData.category}
-              onChange={handleChange}
-              required
-              className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500"
-            >
+            <select name="category" value={formData.category} onChange={handleChange} required className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500">
               <option value="">Select Category</option>
-              {categories
-                .filter(cat => cat.type === "Main")
-                .map(cat => (
-                  <option key={cat._id} value={cat._id}>
-                    {cat.name}
-                  </option>
-                ))}
+              {categories.filter(c => c.type === "Main").map(c => (
+                <option key={c._id} value={c._id}>{c.name}</option>
+              ))}
             </select>
           </div>
 
-          {/* Sub-Category */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Sub-Category</label>
             <select
@@ -391,19 +395,17 @@ export default function EditProductForm() {
               value={formData.subCategory}
               onChange={handleChange}
               disabled={!formData.category}
-              className={`w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500 ${!formData.category ? "bg-gray-100 cursor-not-allowed" : ""}`}
+              className={`w-full border border-gray-300 rounded-lg p-3 ${!formData.category ? "bg-gray-100" : ""}`}
             >
               <option value="">{formData.category ? "None (Optional)" : "Select Main Category First"}</option>
               {subCategories.map(sub => (
-                <option key={sub._id} value={sub._id}>
-                  {sub.name}
-                </option>
+                <option key={sub._id} value={sub._id}>{sub.name}</option>
               ))}
             </select>
           </div>
 
-          <InputField label="Tags (comma separated)" name="tags" value={formData.tags} onChange={handleChange} placeholder="organic, vegan, premium" />
-          <InputField label="Discount (%)" name="discount" type="number" value={formData.discount || "0"} onChange={handleChange} />
+          <InputField label="Tags (comma separated)" name="tags" value={formData.tags} onChange={handleChange} />
+          <InputField label="Discount (%)" name="discount" type="number" min="0" max="100" step="0.01" value={formData.discount} onChange={handleChange} />
 
           {/* Additional Info */}
           <div className="border border-gray-200 rounded-xl p-6">
@@ -413,48 +415,142 @@ export default function EditProductForm() {
             <TextAreaField label="Usage Instructions" name="additionalInfo.usageInstructions" value={formData.additionalInfo.usageInstructions} onChange={handleChange} />
           </div>
 
-          {/* Variants */}
-          <div className="border border-gray-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Add Variant</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 mb-4">
-              <input type="text" placeholder="Size/Measurement" value={variant.size} onChange={e => handleVariantChange("size", e.target.value)} className="border border-gray-300 rounded-lg p-3" />
-              <input type="text" placeholder="Color" value={variant.color} onChange={e => handleVariantChange("color", e.target.value)} className="border border-gray-300 rounded-lg p-3" />
-              <input type="number" placeholder="Price" value={variant.price} onChange={e => handleVariantChange("price", e.target.value)} className="border border-gray-300 rounded-lg p-3" />
-              <input type="number" placeholder="Stock Qty" value={variant.stockQty} onChange={e => handleVariantChange("stockQty", e.target.value)} className="border border-gray-300 rounded-lg p-3" />
-              <button type="button" onClick={addVariant} className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition">
-                + Add
-              </button>
+          {/* Variants Section - Same as Add Form */}
+          <div className="border border-gray-200 rounded-2xl p-6 lg:p-8 bg-white shadow-lg">
+            <h2 className="text-2xl font-bold text-gray-800 mb-8 flex items-center gap-3">
+              <span className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white text-sm">V</span>
+              Product Variants
+            </h2>
+
+            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-6 border border-orange-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Size / Volume *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 100ml, Large"
+                    value={variant.size}
+                    onChange={e => setVariant(prev => ({ ...prev, size: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-4 focus:ring-orange-200 focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Price (₹) *</label>
+                  <input
+                    type="number"
+                    placeholder="299"
+                    value={variant.price}
+                    onChange={e => setVariant(prev => ({ ...prev, price: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-4 focus:ring-orange-200 focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Quantity</label>
+                  <input
+                    type="number"
+                    placeholder="100"
+                    value={variant.stockQty}
+                    onChange={e => setVariant(prev => ({ ...prev, stockQty: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-4 focus:ring-orange-200 focus:border-orange-500"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={addVariant}
+                    disabled={!variant.size || variant.color.length === 0 || !variant.price}
+                    className={`w-full py-3 rounded-xl font-bold text-white transition-all ${!variant.size || variant.color.length === 0 || !variant.price
+                      ? "bg-gray-300 cursor-not-allowed"
+                      : "bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 shadow-lg"
+                    }`}
+                  >
+                    Add Variant
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Colors for this Variant *</label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="Type color (e.g. Rose Gold)"
+                    value={currentColor}
+                    onChange={e => setCurrentColor(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addColorToVariant())}
+                    className="flex-1 min-w-[200px] px-4 py-3 border border-gray-300 rounded-xl focus:ring-4 focus:ring-orange-200 focus:border-orange-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={addColorToVariant}
+                    className="px-8 py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition shadow-md"
+                  >
+                    + Add Color
+                  </button>
+                </div>
+
+                {variant.color.length > 0 && (
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    {variant.color.map((col, i) => (
+                      <div key={i} className="group flex items-center gap-2 bg-white border-2 border-orange-300 rounded-2xl px-4 py-2 shadow-sm">
+                        <div className="w-6 h-6 rounded-full border-2 border-white shadow ring-1 ring-gray-300" style={{ backgroundColor: col.toLowerCase() }} />
+                        <span className="font-medium text-gray-800">{col}</span>
+                        <button onClick={() => removeColorFromVariant(col)} className="ml-2 text-red-500 hover:text-red-700 font-bold text-lg">×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Existing Variants */}
             {formData.variants.length > 0 && (
-              <div className="space-y-2 mt-4">
-                {formData.variants.map((v, idx) => (
-                  <div key={idx} className="flex justify-between items-center bg-gray-100 px-4 py-2 rounded-lg">
-                    <span>{v.size} | {v.color} - ₹{v.price} (Stock: {v.stockQty})</span>
-                    <button type="button" onClick={() => removeVariant(idx)} className="text-red-600 hover:underline">
-                      Remove
-                    </button>
-                  </div>
-                ))}
+              <div className="mt-10">
+                <h3 className="text-xl font-bold text-gray-800 mb-6">Added Variants ({formData.variants.length})</h3>
+                <div className="grid gap-4">
+                  {formData.variants.map((v, idx) => (
+                    <div key={idx} className="bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:shadow-xl transition-shadow">
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-4 text-lg font-bold text-gray-800">
+                          <span className="bg-white px-4 py-2 rounded-lg shadow">{v.size}</span>
+                          <span>₹{v.price}</span>
+                          <span className="text-gray-600 font-normal">• Stock: {v.stockQty || 0}</span>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {v.color.map((c, i) => (
+                            <span key={i} className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border">
+                              <span className="w-4 h-4 rounded-full ring-2 ring-white shadow" style={{ backgroundColor: c.toLowerCase() }} />
+                              <span className="text-sm font-medium">{c}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeVariant(idx)}
+                        className="self-start lg:self-center px-6 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition shadow-md"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Checkboxes */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {/* Checkboxes & Status */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              ["isFeatured", "Featured"],
-              ["isHotProduct", "Hot Product"],
               ["isBestSeller", "Best Seller"],
+              ["isCombo", "Combo"],
             ].map(([key, label]) => (
               <label key={key} className="flex items-center gap-2">
-                <input type="checkbox" name={key} checked={formData[key]} onChange={handleChange} className="h-5 w-5 text-orange-500 focus:ring-orange-500" />
+                <input type="checkbox" name={key} checked={formData[key]} onChange={handleChange} className="h-5 w-5 text-orange-500" />
                 <span className="text-gray-700">{label}</span>
               </label>
             ))}
           </div>
 
-          {/* Status */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select name="status" value={formData.status} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500">
@@ -466,9 +562,9 @@ export default function EditProductForm() {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-3 rounded-lg text-white font-semibold transition ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-orange-600 hover:bg-orange-700"}`}
+            className={`w-full py-4 rounded-lg text-white font-bold text-lg transition ${loading ? "bg-gray-400" : "bg-orange-600 hover:bg-orange-700"}`}
           >
-            {loading ? "Saving..." : "Update Product"}
+            {loading ? "Updating..." : "Update Product"}
           </button>
         </form>
       </div>
@@ -476,8 +572,8 @@ export default function EditProductForm() {
   );
 }
 
-/* Helper Components (same as AddProductForm) */
-const InputField = ({ label, name, value, onChange, type = "text", placeholder }) => (
+/* Reusable Input Components */
+const InputField = ({ label, name, value, onChange, type = "text", placeholder, ...props }) => (
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
     <input
@@ -487,6 +583,7 @@ const InputField = ({ label, name, value, onChange, type = "text", placeholder }
       onChange={onChange}
       placeholder={placeholder}
       className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+      {...props}
     />
   </div>
 );

@@ -134,7 +134,7 @@ const AdminOrderDetails = ({ order, onClose, loading }) => {
                     <tr key={idx} className="border-b">
                       <td className="py-2 px-2 sm:px-4">{item.food?.name || item.selectedVariant?.name || 'Unknown'}</td>
                       <td className="py-2 px-2 sm:px-4">{item.quantity}</td>
-                      <td className="py-2 px-2 sm:px-4">{item.selectedVariant?.size || 'N/A'}</td>
+                      <td className="py-2 px-2 sm:px-4">{item.selectedVariant?.size || 'N/A'}/{item.selectedVariant?.color }</td>
                       <td className="py-2 px-2 sm:px-4 text-right">
                         ₹{((item.selectedVariant?.price || item.food?.price || 0) * item.quantity).toFixed(2)}
                       </td>

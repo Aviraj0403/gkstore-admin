@@ -327,6 +327,7 @@ import { Printer } from 'lucide-react';
 import SalesChart from '../pages/report/SalesChart';
 import WeeklyStatsPieChart from '../pages/Graph/WeeklyStatsPieChart';
 import { getTodayOrders, getTotalRevenue, getTotalOrders, getWeeklyStats, getMonthlyStats, getTotalUsers ,getTotalProducts} from '../services/dashboartdApi'; // Import the necessary API functions
+import ModernLineChart from './Graph/ModernLineChart';
 
 export default function Dashboard() {
   const [orders, setOrders] = useState([]);
@@ -340,7 +341,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const ordersRef = useRef();
 
-  const socketURL = 'https://gkstore-backend.onrender.com/';
+  const socketURL = 'https://api.gurmeetkaurstore.com';
 
   useEffect(() => {
     const socket = io(socketURL, {
@@ -479,149 +480,163 @@ export default function Dashboard() {
       </div>
 
       {/* Today's Orders */}
-      <section className="z-10 relative mt-8 sm:mt-12">
-        <div className="flex justify-between items-center mb-4 sm:mb-6">
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-800">
-            Today's Orders {orders.length > 0 && `(${orders.length})`}
-          </h3>
-          {orders.length > 0 && (
-            <button
-              onClick={handlePrintOrders}
-              className="flex items-center px-3 sm:px-4 py-2 bg-orange-500 text-white rounded-lg shadow-md hover:bg-orange-600 transition-colors"
-            >
-              <Printer size={18} className="mr-2" />
-              Print Orders
-            </button>
-          )}
-        </div>
-        {loading ? (
-          <div className="text-center text-gray-500 py-10 sm:py-20">
-            <div className="inline-block w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="mt-4">Loading orders...</p>
-          </div>
-        ) : (
-          <div ref={ordersRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {orders.length > 0 ? (
-              orders.map((order) => (
-                <div
-                  key={order._id}
-                  className="order-card bg-white p-6 rounded-lg shadow-xl border border-gray-200 hover:shadow-2xl transition-shadow"
-                >
-                  <div className="space-y-3">
-                    {/* Customer & Status */}
-                    <div className="order-header flex justify-between items-start">
-                      <h4 className="text-base sm:text-lg font-semibold text-gray-800">
-                        {order?.shippingAddress?.name || 'N/A'}
-                      </h4>
-                      <span
-                        className={`badge px-2 py-1 rounded-full text-xs font-semibold shadow-sm ${
-                          order.orderStatus === 'Delivered'
-                            ? 'badge-delivered bg-green-100 text-green-600 border border-green-200'
-                            : order.orderStatus === 'Cancelled'
-                            ? 'badge-cancelled bg-red-100 text-red-600 border border-red-200'
-                            : 'badge-pending bg-orange-100 text-orange-600 border border-orange-200'
-                        }`}
-                      >
-                        {order.orderStatus || 'Pending'}
-                      </span>
-                    </div>
-
-                    {/* Order Details */}
-                    <div className="order-details text-sm text-gray-600">
-                      <p>
-                        <span className="font-medium">Order ID:</span>{' '}
-                        {order?._id ? order._id.slice(0, 10) + '...' : 'N/A'}
-                      </p>
-                      <p>
-                        <span className="font-medium">Time:</span>{' '}
-                        {order?.placedAt ? new Date(order.placedAt).toLocaleString() : 'N/A'}
-                      </p>
-                    </div>
-
-                    {/* Payment Method & Status */}
-                    <div className="text-sm text-gray-600">
-                      <p>
-                        <span className="font-medium">Payment:</span> {order?.paymentMethod || 'N/A'}
-                      </p>
-                      <p>
-                        <span className="font-medium">Status:</span>{' '}
-                        <span
-                          className={`inline-block px-2 py-1 rounded-full text-xs font-semibold shadow-sm ${
-                            order.paymentStatus === 'Paid'
-                              ? 'bg-green-100 text-green-600 border border-green-200'
-                              : 'bg-red-100 text-red-600 border border-red-200'
-                          }`}
-                        >
-                          {order.paymentStatus || 'N/A'}
-                        </span>
-                      </p>
-                    </div>
-
-                    {/* Items */}
-                    <div>
-                      <h5 className="text-sm font-semibold text-gray-700 mb-1">Items:</h5>
-                      <ul className="list-disc list-inside max-h-20 sm:max-h-24 overflow-auto text-xs sm:text-sm text-gray-600">
-                        {order?.items?.length > 0 ? (
-                          order.items.map((item, i) => (
-                            <li key={i}>
-                              {item?.selectedVariant?.name || item?.product?.name || 'Unknown'} - {item?.quantity || 0} × ₹
-                              {item?.selectedVariant?.price || item?.product?.price || 0}
-                            </li>
-                          ))
-                        ) : (
-                          <li>N/A</li>
-                        )}
-                      </ul>
-                    </div>
-
-                    {/* Total */}
-                    <p className="text-base sm:text-lg font-bold text-gray-900 border-t pt-2">
-                      Total: ₹{order?.totalAmount?.toFixed(2) || '0.00'}
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-12 text-gray-600">
-                <p className="text-lg font-medium">No orders yet today.</p>
-                <p className="text-sm text-gray-500 mt-2">New orders will appear here automatically.</p>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
-{/* <section className="z-10 relative mt-8 sm:mt-12">
-  <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-gray-800">Weekly Stats</h3>
-  <div className="overflow-x-auto bg-white p-6 rounded-lg shadow-xl border border-gray-200">
-    <table className="w-full text-sm text-left table-auto">
-      <thead className="bg-gradient-to-r from-blue-500 to-blue-700 text-white">
-        <tr className="border-b">
-          <th className="py-3 px-4 text-left">Date</th>
-          <th className="py-3 px-4 text-center">Orders</th>
-          <th className="py-3 px-4 text-center">Revenue</th>
-        </tr>
-      </thead>
-      <tbody>
-        {weeklyStats.map((stat, index) => (
-          <tr
-            key={stat._id}
-            className={`hover:bg-gray-50 transition duration-300 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
-          >
-            <td className="py-4 px-4">{stat._id}</td>
-            <td className="py-4 px-4 text-center">{stat.totalOrders}</td>
-            <td className="py-4 px-4 text-center text-green-600 font-semibold">
-              ₹{stat.totalRevenue.toFixed(2)}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+   <section className="z-10 relative mt-8 sm:mt-12">
+  <div className="flex justify-between items-center mb-4 sm:mb-6">
+    <h3 className="text-lg sm:text-xl font-semibold text-gray-800">
+      Today's Orders {orders.length > 0 && `(${orders.length})`}
+    </h3>
+    {orders.length > 0 && (
+      <button
+        onClick={handlePrintOrders}
+        className="flex items-center px-3 sm:px-4 py-2 bg-orange-500 text-white rounded-lg shadow-md hover:bg-orange-600 transition-colors"
+      >
+        <Printer size={18} className="mr-2" />
+        Print Orders
+      </button>
+    )}
   </div>
-</section> */}
- <section className="z-10 relative mt-8 sm:mt-12">
-        <WeeklyStatsPieChart statsData={weeklyStats} />
-      </section>
+
+  {loading ? (
+    <div className="text-center text-gray-500 py-10 sm:py-20">
+      <div className="inline-block w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+      <p className="mt-4">Loading orders...</p>
+    </div>
+  ) : (
+    <div ref={ordersRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      {orders.length > 0 ? (
+        orders.map((order) => (
+          <div
+            key={order._id}
+            className="order-card bg-white p-6 rounded-lg shadow-xl border border-gray-200 hover:shadow-2xl transition-shadow"
+          >
+            <div className="space-y-4">
+              {/* Customer & Status */}
+              <div className="order-header flex justify-between items-start">
+                <h4 className="text-base sm:text-lg font-semibold text-gray-800">
+                  {order?.shippingAddress?.name || 'N/A'}
+                </h4>
+                <span
+                  className={`badge px-2 py-1 rounded-full text-xs font-semibold shadow-sm ${
+                    order.orderStatus === 'Delivered'
+                      ? 'bg-green-100 text-green-600'
+                      : order.orderStatus === 'Cancelled'
+                      ? 'bg-red-100 text-red-600'
+                      : 'bg-orange-100 text-orange-600'
+                  }`}
+                >
+                  {order.orderStatus || 'Pending'}
+                </span>
+              </div>
+
+              {/* Order Details */}
+              <div className="order-details text-sm text-gray-600">
+                <p>
+                  <span className="font-medium">Order ID:</span>{' '}
+                  {order?._id ? order._id.slice(0, 10) + '...' : 'N/A'}
+                </p>
+                <p>
+                  <span className="font-medium">Time:</span>{' '}
+                  {order?.placedAt ? new Date(order.placedAt).toLocaleString() : 'N/A'}
+                </p>
+              </div>
+
+              {/* Payment Method & Status */}
+              <div className="text-sm text-gray-600">
+                <p>
+                  <span className="font-medium">Payment:</span> {order?.paymentMethod || 'N/A'}
+                </p>
+                <p>
+                  <span className="font-medium">Status:</span>{' '}
+                  <span
+                    className={`inline-block px-2 py-1 rounded-full text-xs font-semibold shadow-sm ${
+                      order.paymentStatus === 'Paid'
+                        ? 'bg-green-100 text-green-600'
+                        : 'bg-red-100 text-red-600'
+                    }`}
+                  >
+                    {order.paymentStatus || 'N/A'}
+                  </span>
+                </p>
+              </div>
+
+              {/* Items */}
+              <div className="border-t border-gray-300 pt-4">
+                <h5 className="text-lg font-semibold text-gray-800 mb-2">Items:</h5>
+                <div className="overflow-auto max-h-60">
+                  {order?.items?.length > 0 ? (
+                    <ul className="space-y-4 text-sm text-gray-700">
+                      {order.items.map((item, i) => (
+                        <li
+                          key={i}
+                          className="flex justify-between items-center py-3 px-4 rounded-lg bg-gray-50 shadow-sm hover:bg-gray-100 transition duration-200"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:space-x-4 w-full">
+                            <div className="flex flex-col sm:flex-row w-full">
+                              <span className="font-medium text-gray-800 w-full sm:w-auto">
+                                {item?.selectedVariant?.name || item?.product?.name || 'Unknown'}
+                              </span>
+                              <span className="text-xs sm:text-sm text-gray-600 sm:ml-4">
+                                ({item?.selectedVariant?.size}/{item?.selectedVariant?.color})
+                              </span>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row sm:justify-end items-end text-sm space-x-1 sm:space-x-3">
+                              <span className="font-semibold text-gray-900">
+                                {item?.quantity || 0} × ₹
+                                {item?.selectedVariant?.price || item?.product?.price || 0}
+                              </span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-center text-gray-500">No items available</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Total */}
+              <p className="text-base sm:text-lg font-bold text-gray-900 border-t pt-2">
+                Total: ₹{order?.totalAmount?.toFixed(2) || '0.00'}
+              </p>
+            </div>
+          </div>
+        ))
+      ) : (
+        <div className="col-span-full text-center py-12 text-gray-600">
+          <p className="text-lg font-medium">No orders yet today.</p>
+          <p className="text-sm text-gray-500 mt-2">New orders will appear here automatically.</p>
+        </div>
+      )}
+    </div>
+  )}
+</section>
+
+
+      {/* Charts Section */}
+<section className="z-10 relative mt-8 sm:mt-12">
+  {/* Title and Download Button outside the cards */}
+ 
+
+  {/* Cards Grid Layout */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+    {/* Pie Chart Card */}
+    {/* <div className="bg-white p-6 rounded-lg shadow-xl border border-gray-200 mt-6"> */}
+      {/* <h4 className="text-xl font-semibold text-gray-800 mb-4">Order Distribution</h4> */}
+      <WeeklyStatsPieChart statsData={weeklyStats} />
+    {/* </div> */}
+
+    {/* Line Chart Card */}
+    {/* <div className="bg-white p-6 rounded-lg shadow-xl border border-gray-200 mt-6"> */}
+      {/* <h4 className="text-xl font-semibold text-gray-800 mb-4">Revenue & Orders Trend</h4> */}
+      <ModernLineChart statsData={weeklyStats} />
+    {/* </div> */}
+  </div>
+</section>
+
+
+
       {/* Sales Chart */}
       <section className="z-10 relative mt-8 sm:mt-12">
         <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-gray-800">Sales Trends</h3>
