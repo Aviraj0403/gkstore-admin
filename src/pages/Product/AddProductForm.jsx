@@ -506,13 +506,13 @@ export default function AddProductForm() {
             type="number"
             min="0"       // Prevents input of numbers less than 0
             max="100"     // Optional, if you want to limit the value to 100
-            step="0.01"   // Allows decimals
+            // step="0.01"   // Allows decimals
             value={formData.discount}
             onChange={handleChange}  // No custom parsing needed here
             placeholder="e.g. 10"
           />
 
-
+ {/* {console.log("dcnt input ",formData.discount)} */}
 
           {/* Additional Info */}
           <div className="border border-gray-200 rounded-xl p-6">

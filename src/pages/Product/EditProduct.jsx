@@ -405,8 +405,8 @@ export default function EditProductForm() {
           </div>
 
           <InputField label="Tags (comma separated)" name="tags" value={formData.tags} onChange={handleChange} />
-          <InputField label="Discount (%)" name="discount" type="number" min="0" max="100" step="0.01" value={formData.discount} onChange={handleChange} />
-
+          <InputField label="Discount (%)" name="discount" type="number" min="0" max="100"  value={formData.discount} onChange={handleChange} />
+          {/* {console.log("dcnt input ",formData.discount)} */}
           {/* Additional Info */}
           <div className="border border-gray-200 rounded-xl p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Additional Information</h2>
